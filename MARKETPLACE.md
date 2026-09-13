@@ -10,7 +10,7 @@
 
 **License:** MIT
 
-**Status:** Beta 0.2.1
+**Status:** Beta 0.2.2
 
 ## Description
 
@@ -26,18 +26,22 @@ requests are suppressed, and agents acknowledge exact response IDs.
 
 **Beta limits:** a waiting MCP client can receive your reply directly. Idle Codex
 resumption passed a real delivery/acknowledgement test on desktop build
-26.901.51231, but uses an internal, version-sensitive interface. It requires a
-discoverable conversation owner. Idle Claude Chat and Hermes conversations must
-resume to read saved replies. Standing instructions guide agents but cannot
-guarantee compliance in every conversation.
+26.901.51231 with 0.2.1, but uses an internal, version-sensitive interface. It
+requires a discoverable conversation owner. Idle Claude Chat and Hermes
+conversations must resume to read saved replies. Standing instructions guide agents
+but cannot guarantee compliance in every conversation; the operator boundary is
+policy plus each app's own permission prompts. Disconnect apps from the Agents view
+before removing the plugin. An independent review on 2026-09-13 found five beta
+blockers, fixed in 0.2.2 with regression tests.
 
 ## Evidence
 
 - `preview.png`: native UI with demo data.
 - `docs/demo.mp4` and `docs/demo.gif`: 30-second recording using a scripted MCP
   client and automated UI actions; not proof of idle desktop resumption.
-- `REVIEW.md`: tested versions, 31 Python tests, 22 native checks, clean-checkout
-  isolated installation, and remaining integration limits.
+- `REVIEW.md`: the independent review, the 0.2.2 fixes, tested versions,
+  Python regression tests, 30 recorded native checks, clean-checkout isolated installation, and
+  remaining integration limits.
 - `docs/live-codex-verification.json`: real idle-task resumption and exact-response
   acknowledgement on the recorded Codex build.
 

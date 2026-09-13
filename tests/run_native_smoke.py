@@ -38,6 +38,8 @@ with tempfile.TemporaryDirectory(prefix='operator-todos-smoke-') as temp:
         (DEST / 'TodoPanel.qml').write_text(qml)
         (DEST / 'operator_todos.py').write_text('import os,sys,runpy,json\n'
             f'os.environ["OPERATOR_TODOS_DATA"] = {str(work / "data")!r}\n'
+            # No Codex IPC endpoint here, so a delivery attempt fails closed without reaching the real app.
+            f'os.environ["CODEX_HOME"] = {str(work / "no-codex")!r}\n'
             'if len(sys.argv)>2 and sys.argv[1]=="post" and json.loads(sys.argv[2]).get("title")=="SIMULATE_SAVE_FAILURE":\n'
             '    print(json.dumps({"ok":False,"error":"Simulated storage error"})); sys.exit(1)\n'
             f'sys.path.insert(0, {str(ROOT)!r})\n'

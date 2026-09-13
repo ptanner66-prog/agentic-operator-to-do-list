@@ -37,6 +37,28 @@ SETUP_MESSAGE = ('Instructions are installed for future sessions. Reconnect MCP 
                  'Codex session hooks also require the app’s normal hook review before they run. '
                  'Claude Code hooks refresh the policy each turn; regular Claude Chat gets it through MCP. '
                  'Idle Claude and Hermes conversations need to resume or read the saved reply.')
+# App hooks run this launcher, which lives outside the plugin folder. Removing the plugin
+# therefore never leaves a hook that fails; a missing target exits 0 with no output.
+LAUNCHER = '''#!/usr/bin/env python3
+"""Agentic Operator To Do List session hook launcher.
+
+Kept outside the plugin folder so that removing the plugin never leaves an app
+hook pointing at a missing file. Exits 0 without output when the plugin is absent.
+"""
+import os
+import sys
+target = {target}
+if os.path.isfile(target):
+    os.execv(sys.executable, [sys.executable, target] + sys.argv[1:])
+'''
+
+
+def hook_launcher():
+    return POLICY_DIR / 'session-hook.py'
+
+
+def write_hook_launcher():
+    write(hook_launcher(), LAUNCHER.replace('{target}', json.dumps(str(DEST / 'agent_policy.py'))))
 
 
 def backup(path):
@@ -143,15 +165,22 @@ def set_server(data, key, source, remove=False, code=False):
 
 
 def hook_command(source):
-    return shlex.join([PYTHON, str(DEST / 'agent_policy.py'), '--source', source])
+    return shlex.join([PYTHON, str(hook_launcher()), '--source', source])
 
 
 def owns_hook(hook):
     try:
-        return any(Path(a).name == 'agent_policy.py' and Path(a).parent.name in (ID, 'local.operator-todos')
+        return any((Path(a).name == 'agent_policy.py' and Path(a).parent.name in (ID, 'local.operator-todos'))
+                   or (Path(a).name == hook_launcher().name and Path(a).parent.name == POLICY_DIR.name)
                    for a in shlex.split(hook.get('command', '')))
     except ValueError:
         return False
+
+
+def hooks_current(data):
+    """True when every hook of ours already runs through the removal-safe launcher."""
+    owned = [h for groups in (data.get('hooks') or {}).values() for g in groups for h in g.get('hooks', []) if owns_hook(h)]
+    return bool(owned) and all(str(hook_launcher()) in h.get('command', '') for h in owned) and hook_launcher().exists()
 
 
 def configure_hooks(data, source, remove=False):
@@ -227,8 +256,10 @@ def connect_codex(remove=False):
     hook_path = CODEX_DIR / 'hooks.json'
     hooks = json_file(hook_path)
     configure_hooks(hooks, 'codex', remove)
-    write(path, result)
-    write_json(hook_path, hooks)
+    if not remove or path.exists():
+        write(path, result)
+    if not remove or hook_path.exists():
+        write_json(hook_path, hooks)
     instructions(codex_instruction_path(), remove)
     # Clean our previous inactive block when a real global override takes precedence.
     for candidate in (CODEX_DIR / 'AGENTS.md', CODEX_DIR / 'AGENTS.override.md'):
@@ -246,9 +277,9 @@ def connect_claude(remove=False):
     set_server(desktop, 'operator-todos', 'claude', remove)
     set_server(code, 'operator-todos', 'claude', remove, code=True)
     configure_hooks(settings, 'claude', remove)
-    write_json(desktop_path, desktop)
-    write_json(code_path, code)
-    write_json(settings_path, settings)
+    for target, data in ((desktop_path, desktop), (code_path, code), (settings_path, settings)):
+        if not remove or target.exists():
+            write_json(target, data)
     instructions(USER_DIR / '.claude/CLAUDE.md', remove)
 
 
@@ -291,7 +322,21 @@ def connect(source, remove=False):
         with setup_transaction():
             if not remove:
                 write(POLICY_DIR / 'AGENTS.md', policy(DEST, PYTHON))
+                write_hook_launcher()
             {'codex': connect_codex, 'claude': connect_claude, 'hermes': connect_hermes}[source](remove)
+
+
+def disconnect(sources):
+    """Remove this plugin's entries from each app; safe to run before `omarchy plugin remove`."""
+    done = []
+    for source in sources:
+        try:
+            connect(source, remove=True)
+        except ImportError:
+            # The optional adapter dependency is missing, so nothing of ours can be configured there.
+            continue
+        done.append(source)
+    return done
 
 
 def has_policy(path):
@@ -320,6 +365,10 @@ def status(store):
                     configured = all(has_policy(p / 'SOUL.md') and owns_server(
                         (yaml.safe_load((p / 'config.yaml').read_text()) or {}).get('mcp_servers', {}).get('operator-todos')) for p in profiles)
             detail = 'Standing instructions and connection configured.' if configured else 'Connect to install standing instructions and agent tools.'
+            if configured and source == 'codex' and not hooks_current(json_file(CODEX_DIR / 'hooks.json')):
+                detail += ' Repair to move its hooks to the removal-safe launcher.'
+            if configured and source == 'claude' and not hooks_current(json_file(USER_DIR / '.claude/settings.json')):
+                detail += ' Repair to move its hooks to the removal-safe launcher.'
             receipts = [r for r in seen if r['source'] == source]
             if receipts:
                 latest = max(receipts, key=lambda r: r['seen'])
@@ -380,9 +429,7 @@ def main():
         print(json.dumps(status(Store()), indent=2))
         return
     if args.disconnect:
-        for app in args.disconnect:
-            connect(app, remove=True)
-        print('Disconnected: ' + ', '.join(args.disconnect) + '. Saved to-dos are retained.')
+        print('Disconnected: ' + ', '.join(disconnect(args.disconnect)) + '. Saved to-dos are retained.')
         return
     subprocess.run(['omarchy', 'plugin', 'validate', str(SOURCE)], check=True)
     if DEST.exists() and DEST.resolve() != SOURCE:

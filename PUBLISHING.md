@@ -11,8 +11,9 @@ instance or write into `/usr/share/omarchy`.
 
 ## Release validation
 
-The 0.2.1 candidate is labeled **beta**. See `REVIEW.md` and `verification.json`
-for the checks completed and integration tests still needed before a stable claim.
+The 0.2.2 candidate is labeled **beta**. See `REVIEW.md` and `verification.json`
+for the checks completed, the five review blockers fixed in 0.2.2, and the
+integration tests still needed before a stable claim.
 
 ```sh
 omarchy plugin validate .
@@ -28,7 +29,8 @@ warnings. Investigate syntax, type, and layout errors; check the running shell
 log as well as the static report.
 
 Check the bar on each display; open, close, Escape, reopen, disable/re-enable,
-and restart the shell. Check a fresh installation with no agent configuration,
+and restart the shell. Check that Agents → Disconnect all apps removes every MCP
+entry and hook, and that `omarchy plugin remove` afterwards leaves each app usable. Check a fresh installation with no agent configuration,
 then use Agents → Connect. Confirm Add, Enter, delete, dismiss, restore, short/long
 lists, long context scrolling, and the attention dot. The red dot belongs on the
 closed bar icon; green connection dots belong only in Agents. Use temporary data.
@@ -68,7 +70,9 @@ Optional local Hermes setup: PyYAML. Tests use the same runtime.
 
 Ordinary plugin installation places the bar widget. Connecting an app is an
 explicit setup action in the panel or installer. It writes only the documented
-per-user MCP, policy and hook settings, with backups; it does not alter app
+per-user MCP, policy and hook settings plus the hook launcher and shared policy
+under `~/.config/omarchy/operator-todos/`, with backups; it does not alter app
 permission modes, trust hooks automatically, restart apps, or expose a network
-service. Disconnect integrations before removing the plugin. Saved to-dos are
-retained after disable, disconnect, or removal.
+service. Disconnect integrations, with **Disconnect all apps** in Agents or
+`install.py --disconnect`, before removing the plugin. Saved to-dos are retained
+after disable, disconnect, or removal.

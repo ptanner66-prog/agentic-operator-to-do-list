@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local operator inbox. Python standard library; no listening network port."""
 import argparse
+import collections
 import contextlib
 import json
 import os
@@ -17,7 +18,12 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent
 from agent_policy import policy
 INSTRUCTIONS = policy()
+VERSION = json.loads((ROOT / "manifest.json").read_text()).get("version", "0")
 PRESENCE_TTL = 15
+# A handed-over or sent reply without acknowledgement for this long needs the operator.
+UNACKNOWLEDGED_AFTER = 900
+# Fields that define the decision an operator reviews; a repost may not change them silently.
+DECISION_FIELDS = ("title", "kind", "context", "recommendation", "consequence", "options")
 
 
 def process_identity(pid):
@@ -31,10 +37,12 @@ def process_identity(pid):
         return None
 
 
-def clean(value, name, limit=12000, required=False):
+def clean(value, name, limit=12000, required=False, single_line=False):
     if not isinstance(value, str) or len(value) > limit:
         raise ValueError(f"Invalid {name}")
-    value = value.strip()
+    # Control characters cannot forge lines in delivered messages or the panel.
+    value = "".join(ch if ch in "\n\t" or (ch >= " " and ch != "\x7f") else " " for ch in value)
+    value = " ".join(value.split()) if single_line else value.strip()
     if required and not value:
         raise ValueError(f"{name} is required")
     return value
@@ -69,10 +77,11 @@ class Store:
         finally:
             db.close()
 
-    def save(self, db, item):
+    def save(self, db, item, bump=True):
         item["updated_at"] = time.time()
         db.execute("UPDATE items SET body=? WHERE id=?", (json.dumps(item, ensure_ascii=False), item["id"]))
-        db.execute("UPDATE revision SET value=value+1 WHERE id=1")
+        if bump:
+            db.execute("UPDATE revision SET value=value+1 WHERE id=1")
 
     def record_connection(self, source, mode, client):
         with self.db(True) as db:
@@ -111,13 +120,28 @@ class Store:
             raise ValueError("To-do not found")
         return json.loads(row[0])
 
-    def post(self, data, source="manual"):
-        source = clean(source, "source", 40, True)
-        session = clean(data.get("session_id", ""), "session_id", 200)
-        key = clean(data.get("request_key", ""), "request_key", 200, source != "manual") or str(uuid.uuid4())
+    @staticmethod
+    def check_session(item, session_id, require=False):
+        """A request that names a conversation may only be consumed by that conversation."""
+        actual = item.get("session_id") or ""
+        if not actual:
+            return
+        if session_id is None or session_id == "":
+            if require:
+                raise ValueError("Include your session_id; this request belongs to a specific conversation")
+            return
+        if not isinstance(session_id, str) or session_id != actual:
+            raise ValueError("This request belongs to another conversation")
+
+    def post(self, data, source="manual", expected_session=""):
+        source = clean(source, "source", 40, True, True)
+        session = clean(data.get("session_id", ""), "session_id", 200, single_line=True)
+        if expected_session and session and session != expected_session:
+            raise ValueError("session_id does not match this conversation's actual session ID; omit it or use the real one")
+        key = clean(data.get("request_key", ""), "request_key", 200, source != "manual", True) or str(uuid.uuid4())
         if source != "manual" and not (data.get("important") is True or data.get("explicitly_requested") is True):
             raise ValueError("Only important operator decisions or explicitly requested to-dos belong here")
-        title = clean(data.get("title", ""), "title", 200, True)
+        title = clean(data.get("title", ""), "title", 200, True, True)
         kind = data.get("kind", "task")
         if kind not in ("task", "approval", "choice", "reply"):
             raise ValueError("Invalid kind")
@@ -130,31 +154,44 @@ class Store:
         options = data.get("options", [])
         if not isinstance(options, list) or len(options) > 8:
             raise ValueError("Use up to eight options")
-        options = [clean(x, "option", 200, True) for x in options]
+        options = [clean(x, "option", 200, True, True) for x in options]
         if kind == "choice" and len(options) < 2:
             raise ValueError("A choice needs at least two options")
         if len(set(options)) != len(options):
             raise ValueError("Options must be unique")
-        url = clean(data.get("chat_url", ""), "chat_url", 2000)
+        url = clean(data.get("chat_url", ""), "chat_url", 2000, single_line=True)
         if url and not url.startswith(("https://", "codex://threads/", "claude://", "hermes://")):
             raise ValueError("Use a conversation URL, not a command or file path")
+        if url.startswith("codex://threads/"):
+            try:
+                uuid.UUID(url[len("codex://threads/"):])
+            except ValueError:
+                raise ValueError("Codex links are codex://threads/<thread UUID>")
         if not url and source == "codex" and session:
             try:
                 uuid.UUID(session)
                 url = "codex://threads/" + session
             except ValueError:
                 pass
+        decision = dict(title=title, kind=kind, context=context, recommendation=recommendation,
+                        consequence=consequence, options=options)
         with self.db(True) as db:
             row = db.execute("SELECT body FROM items WHERE source=? AND session=? AND request_key=?", (source, session, key)).fetchone()
             if row:
                 # A repeated model call must not reopen a dismissed or answered decision,
                 # nor silently change the action the operator is reviewing.
-                return json.loads(row[0])
+                existing = json.loads(row[0])
+                if "title" in existing and any(existing.get(f) != decision[f] for f in DECISION_FIELDS):
+                    if existing["status"] != "open":
+                        raise ValueError("This request_key was already reviewed for a different decision. "
+                                         "A materially different decision needs a new request_key; the earlier response does not cover it.")
+                    return dict(existing, mismatch=True, note="A request with this key already exists with different text. "
+                                "The operator reviews the stored text returned here, not what you just sent. "
+                                "Use a new request_key if the decision changed materially.")
+                return existing
             item = dict(id=str(uuid.uuid4()), source=source, session_id=session,
-                        request_key=key, title=title, kind=kind, term=term,
-                        context=context, recommendation=recommendation,
-                        consequence=consequence, options=options,
-                        project=clean(data.get("project", ""), "project", 200),
+                        request_key=key, term=term, **decision,
+                        project=clean(data.get("project", ""), "project", 200, single_line=True),
                         chat_url=url, status="open", response=None,
                         delivery="", delivery_error="", created_at=time.time(),
                         updated_at=time.time(), snoozed_until=0, waiting_until=0,
@@ -163,12 +200,25 @@ class Store:
             self.save(db, item)
             return item
 
+    @staticmethod
+    def unacknowledged(item, now):
+        response = item.get("response") or {}
+        # Older records lack delivery_at; their latest update is the best available
+        # hand-over timestamp until a new delivery records an explicit one.
+        delivered_at = item.get("delivery_at") or item.get("updated_at") or response.get("at", now)
+        return (item["status"] == "answered" and item.get("delivery") in ("received", "sent")
+                and now - delivered_at > UNACKNOWLEDGED_AFTER)
+
     def snapshot(self):
         with self.db() as db:
             items = [json.loads(r[0]) for r in db.execute("SELECT body FROM items")]
             rev = db.execute("SELECT value FROM revision WHERE id=1").fetchone()[0]
         now = time.time()
-        attention = sum((i["status"] == "open" and i.get("snoozed_until", 0) <= now and i["source"] != "manual") or i.get("delivery") == "failed" for i in items)
+        attention = 0
+        for i in items:
+            i["unacknowledged"] = self.unacknowledged(i, now)
+            attention += ((i["status"] == "open" and i.get("snoozed_until", 0) <= now and i["source"] != "manual")
+                          or i.get("delivery") == "failed" or i["unacknowledged"])
         items = [i for i in items if i["status"] != "deleted"]
         items.sort(key=lambda i: (i["status"] != "open", not i.get("important", False), i["created_at"]))
         return {"revision": rev, "attention": attention, "items": items, "now": now, "live_agents": self.live_agents()}
@@ -188,7 +238,7 @@ class Store:
             elif action == "restore":
                 if item["status"] not in ("done", "dismissed"):
                     raise ValueError("Only items in History can be moved back")
-                item.update(status="open", response=None, delivery="", delivery_error="",
+                item.update(status="open", response=None, delivery="", delivery_error="", delivery_at=0,
                             snoozed_until=0, waiting_until=0)
             elif action == "move":
                 if data.get("term") not in ("short", "long"):
@@ -198,6 +248,11 @@ class Store:
                 if item["status"] != "open":
                     raise ValueError("Only open requests can be snoozed")
                 item["snoozed_until"] = time.time() + 3600
+            elif action == "retry":
+                # The operator's decision is unchanged; only the hand-over is repeated.
+                if item["status"] != "answered" or item.get("delivery") not in ("received", "sent", "failed"):
+                    raise ValueError("Only an answered request that is still unacknowledged can be resent")
+                item.update(delivery="saved", delivery_error="", delivery_at=0, waiting_until=0)
             elif action in ("approve", "reject", "reply", "choose", "done", "dismiss"):
                 if item["status"] != "open":
                     raise ValueError("This item has already been handled")
@@ -215,6 +270,7 @@ class Store:
                 item["response"] = {"id": str(uuid.uuid4()), "action": action, "text": value, "at": time.time()}
                 item["status"] = "dismissed" if action == "dismiss" else ("done" if item["source"] == "manual" else "answered")
                 item["delivery"] = "saved" if item["source"] != "manual" else ""
+                item["delivery_at"] = 0
             else:
                 raise ValueError("Unknown action")
             self.save(db, item)
@@ -227,12 +283,19 @@ class Store:
                 return item
             if item["status"] != "deleted" and item.get("delivery") != "acknowledged":
                 item.update(delivery=state, delivery_error=error)
+                if state in ("received", "sent"):
+                    item["delivery_at"] = time.time()
                 self.save(db, item)
         return item
 
-    def ack(self, item_id, response_id):
+    def received(self, item_id, response_id):
+        """Record a hand-over only after the response was actually written to the waiting agent."""
+        return self.mark_delivery(item_id, "received", response_id=response_id)
+
+    def ack(self, item_id, response_id, session_id=None, require_session=False):
         with self.db(True) as db:
             item = self.fetch(db, item_id)
+            self.check_session(item, session_id, require_session)
             if not item.get("response") or item["response"]["id"] != response_id:
                 raise ValueError("Acknowledgement does not match the operator response")
             if item["status"] not in ("deleted", "dismissed"):
@@ -241,23 +304,30 @@ class Store:
             self.save(db, item)
         return item
 
-    def wait(self, item_id, seconds=50):
+    def wait(self, item_id, seconds=50, stop=None):
+        """Wait for a response without claiming the agent received it; the caller records hand-over."""
         seconds = max(0, min(float(seconds), 55))
         with self.db(True) as db:
             item = self.fetch(db, item_id)
             item["waiting_until"] = time.time() + seconds + 3
-            self.save(db, item)
+            self.save(db, item, bump=False)
         end = time.monotonic() + seconds
         while True:
             item = self.get(item_id)
-            if item.get("response"):
-                if item.get("delivery") != "acknowledged":
-                    item = self.mark_delivery(item_id, "received", response_id=item["response"]["id"])
-                if item.get("response"):
-                    return item
-            if time.monotonic() >= end:
+            if item.get("response") or time.monotonic() >= end or (stop is not None and stop.is_set()):
                 return item
-            time.sleep(.2)
+            if stop is not None:
+                stop.wait(.2)
+            else:
+                time.sleep(.2)
+
+    def release_wait(self, item_id):
+        """A cancelled wait must not keep the desktop dispatcher from delivering."""
+        with self.db(True) as db:
+            item = self.fetch(db, item_id)
+            if item.get("waiting_until"):
+                item["waiting_until"] = 0
+                self.save(db, item, bump=False)
 
     def dispatch_one(self):
         """Claim one saved reply across all bar instances; never retry uncertain sends."""
@@ -293,9 +363,10 @@ def string(description=""):
     return {"type": "string", "description": description}
 
 
+SESSION_ARG = string("Your actual session/conversation ID; required when the request names one")
 TOOLS = [
     tool("operator_post", INSTRUCTIONS, {
-        "request_key": string("Stable key for this exact decision; reuse on repeated calls"),
+        "request_key": string("Stable key for this exact decision; reuse on repeated calls. A result with mismatch: true means the stored request differs from what you sent"),
         "session_id": string("Actual originating conversation/session ID, when known"),
         "title": string("Short actionable request"),
         "kind": {"type": "string", "enum": ["task", "approval", "choice", "reply"]},
@@ -307,18 +378,22 @@ TOOLS = [
         "options": {"type": "array", "items": string(), "maxItems": 8},
         "project": string(), "chat_url": string("Actual conversation link; never invent an ID")
     }, ("request_key", "title", "context", "kind", "term")),
-    tool("operator_get", "Read an operator request and its actual response. Open, dismissed, and deleted requests are not approvals.", {"id": string()}, ("id",), True),
+    tool("operator_get", "Read an operator request and its actual response. Open, dismissed, and deleted requests are not approvals.", {"id": string(), "session_id": SESSION_ARG}, ("id",), True),
     tool("operator_list", "Find your requests and replies. Filter by this conversation's session_id when known.", {"session_id": string()}, (), True),
-    tool("operator_wait", "Wait up to 55 seconds for the operator's response to an existing request. If still open, continue independent work or wait again while blocked. Do not repost it.", {"id": string(), "seconds": {"type": "number", "minimum": 0, "maximum": 55}}, ("id",), True),
-    tool("operator_ack", "After reading an actual response, acknowledge its response ID and continue within that response's scope. Dismissal is not approval.", {"id": string(), "response_id": string()}, ("id", "response_id"))
+    tool("operator_wait", "Wait up to 55 seconds for the operator's response to an existing request. If still open, continue independent work or wait again while blocked. Do not repost it.", {"id": string(), "session_id": SESSION_ARG, "seconds": {"type": "number", "minimum": 0, "maximum": 55}}, ("id",), True),
+    tool("operator_ack", "After reading an actual response, acknowledge its response ID from the originating conversation and continue within that response's scope. Dismissal is not approval.", {"id": string(), "response_id": string(), "session_id": SESSION_ARG}, ("id", "response_id"))
 ]
 
 
 def serve_mcp(store, source):
     lock = threading.Lock()
+    waits_lock = threading.Lock()
+    waits = {}  # JSON-RPC id -> stop event, so a cancelled wait ends without a result
+    cancelled = collections.deque(maxlen=64)  # cancellations that arrived before their wait registered
     connection_id = str(uuid.uuid4())
     initialized = threading.Event()
     stopped = threading.Event()
+    expected_session = os.environ.get("CODEX_THREAD_ID", "") if source == "codex" else ""
 
     def keep_alive():
         while not stopped.wait(5):
@@ -335,13 +410,16 @@ def serve_mcp(store, source):
         with lock:
             print(json.dumps(payload, ensure_ascii=False), flush=True)
 
+    def content(value):
+        return {"content": [{"type": "text", "text": json.dumps(value, ensure_ascii=False)}], "isError": False}
+
     def handle(req):
         request_id = req.get("id")
         try:
             method, params = req.get("method"), req.get("params", {})
             if method == "initialize":
                 store.record_connection(source, "mcp", (params.get("clientInfo") or {}).get("name", "MCP client"))
-                result = {"protocolVersion": params.get("protocolVersion", "2024-11-05"), "capabilities": {"tools": {}}, "serverInfo": {"name": "operator-todos", "version": "0.2.1"}, "instructions": INSTRUCTIONS}
+                result = {"protocolVersion": params.get("protocolVersion", "2024-11-05"), "capabilities": {"tools": {}}, "serverInfo": {"name": "operator-todos", "version": VERSION}, "instructions": INSTRUCTIONS}
             elif method == "ping":
                 result = {}
             elif method == "tools/list":
@@ -349,16 +427,49 @@ def serve_mcp(store, source):
             elif method == "tools/call":
                 name, args = params.get("name"), params.get("arguments", {})
                 if name == "operator_post":
-                    value = store.post(args, source)
+                    value = store.post(args, source, expected_session)
                 elif name == "operator_list":
                     value = [x for x in store.snapshot()["items"] if x["source"] == source and (not args.get("session_id") or x.get("session_id") == args["session_id"])]
                 elif name in ("operator_get", "operator_wait", "operator_ack"):
-                    if store.get(args["id"])["source"] != source:
+                    item = store.get(args["id"])
+                    if item["source"] != source:
                         raise ValueError("This request belongs to another integration")
-                    value = store.get(args["id"]) if name == "operator_get" else store.wait(args["id"], args.get("seconds", 50)) if name == "operator_wait" else store.ack(args["id"], args["response_id"])
+                    store.check_session(item, args.get("session_id"), require=True)
+                    if name == "operator_get":
+                        value = item
+                    elif name == "operator_ack":
+                        value = store.ack(args["id"], args["response_id"], args.get("session_id"), True)
+                    else:
+                        stop = threading.Event()
+                        with waits_lock:
+                            waits[request_id] = stop
+                            if request_id in cancelled:
+                                stop.set()
+                        try:
+                            value = store.wait(args["id"], args.get("seconds", 50), stop)
+                        finally:
+                            with waits_lock:
+                                waits.pop(request_id, None)
+                        if stop.is_set():
+                            # The client abandoned this call; a result now would be read by nobody.
+                            store.release_wait(args["id"])
+                            return
+                        if value.get("response") and value.get("delivery") not in ("acknowledged", "received", "sent"):
+                            # Hand-over is recorded only after the result reached the client.
+                            emit({"jsonrpc": "2.0", "id": request_id, "result": content(dict(value, delivery="received"))})
+                            store.received(args["id"], value["response"]["id"])
+                            return
                 else:
                     raise ValueError("Unknown tool")
-                result = {"content": [{"type": "text", "text": json.dumps(value, ensure_ascii=False)}], "isError": False}
+                result = content(value)
+            elif method == "notifications/cancelled":
+                with waits_lock:
+                    stop = waits.get((params or {}).get("requestId"))
+                    if stop is None:
+                        cancelled.append((params or {}).get("requestId"))
+                if stop is not None:
+                    stop.set()
+                return
             elif method and method.startswith("notifications/"):
                 return
             else:
@@ -401,7 +512,7 @@ def serve_mcp(store, source):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["mcp", "watch", "list", "post", "act", "get", "ack", "instructions", "setup-status", "connect"])
+    parser.add_argument("command", choices=["mcp", "watch", "list", "post", "act", "get", "ack", "instructions", "setup-status", "connect", "disconnect"])
     parser.add_argument("payload", nargs="?", default="{}", help="JSON argument, or - to read JSON from stdin")
     parser.add_argument("--source", default=os.environ.get("OPERATOR_TODOS_SOURCE", "manual"))
     args = parser.parse_args()
@@ -430,22 +541,31 @@ def main():
                 last = signature
             time.sleep(1)
     data = json.load(sys.stdin) if args.payload == "-" else json.loads(args.payload)
-    if args.command in ("setup-status", "connect"):
+    # Codex exports its real thread ID to agent shells; an explicit different ID is a misroute.
+    thread = os.environ.get("CODEX_THREAD_ID", "")
+    if args.command in ("setup-status", "connect", "disconnect"):
         import install
         if args.command == "connect":
             install.connect(data.get("source"))
+        elif args.command == "disconnect":
+            disconnected = install.disconnect(data.get("sources") or list(install.SOURCES))
         result = install.status(store)
         if args.command == "connect":
             result["message"] = install.SETUP_MESSAGE
+        elif args.command == "disconnect":
+            result["message"] = ("Disconnected " + ", ".join(disconnected) + ". Saved to-dos are retained; the plugin can now be removed safely."
+                                 if disconnected else "No connected apps were found.")
     elif args.command == "post":
-        data.setdefault("session_id", os.environ.get("CODEX_THREAD_ID", "") if args.source == "codex" else "")
-        result = store.post(data, args.source)
+        expected = thread if args.source == "codex" else ""
+        data.setdefault("session_id", expected)
+        result = store.post(data, args.source, expected)
     elif args.command == "act":
         result = store.act(data)
     elif args.command == "get":
         result = store.get(data["id"])
+        store.check_session(result, data.get("session_id") or thread or None)
     elif args.command == "ack":
-        result = store.ack(data["id"], data["response_id"])
+        result = store.ack(data["id"], data["response_id"], data.get("session_id") or thread or None, require_session=True)
     else:
         result = store.snapshot()
     print(json.dumps({"ok": True, "result": result}, ensure_ascii=False))

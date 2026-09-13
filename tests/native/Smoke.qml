@@ -8,6 +8,8 @@ Item {
   property int ticks: 0
   property bool finished: false
   property string firstId: ""
+  property string agentId: ""
+  property double failedAt: 0
   property var checks: []
   function report(ok, message) {
     if (finished) return
@@ -26,6 +28,12 @@ Item {
     if (!panel) report(false, "Panel failed to instantiate")
   }
   Process { id: writer }
+  Process {
+    id: poster
+    command: ["python3", Qt.resolvedUrl("operator_todos.py").toString().replace(/^file:\/\//, ""), "post",
+      JSON.stringify({request_key: "smoke-delivery", session_id: "00000000-0000-4000-8000-00000000abcd", title: "Smoke delivery check", kind: "approval", term: "short", important: true,
+        context: "Native smoke test request.", recommendation: "Approve.", consequence: "Nothing outside the isolated test database."}), "--source", "codex"]
+  }
   Timer {
     interval: 100
     running: !test.finished
@@ -89,6 +97,28 @@ Item {
           check(!panel.attentionIndicatorVisible, "Resolving attention clears the dot")
           panel.connected = false
           check(!panel.agentConnected("codex"), "Disconnected watcher cannot claim a live agent")
+          panel.connected = true
+          check(panel.deliveryLabel({status: "answered", delivery: "sent", unacknowledged: true, source: "codex"}).indexOf("no acknowledgement") >= 0, "Stale hand-over label asks for a retry")
+          check(panel.deliveryLabel({status: "answered", delivery: "saved", source: "codex", session_id: ""}).indexOf("no conversation ID") >= 0, "Missing conversation ID is labelled")
+          poster.running = true
+          stage = 7
+        } else if (stage === 7 && panel.rows.some(function(r) { return r.source === "codex" })) {
+          var agent = panel.rows.filter(function(r) { return r.source === "codex" })[0]
+          agentId = agent.id
+          check(agent.session_id === "00000000-0000-4000-8000-00000000abcd", "Agent request carries its conversation ID")
+          panel.act(agentId, "approve")
+          stage = 8
+        } else if (stage === 8 && panel.rows.some(function(r) { return r.id === agentId && r.delivery === "failed" })) {
+          var failed = panel.rows.filter(function(r) { return r.id === agentId })[0]
+          check(failed.response && failed.response.action === "approve", "Approving records the operator decision")
+          check(!!failed.delivery_error, "Failed desktop delivery keeps its reason for the row")
+          check(panel.deliveryLabel(failed).indexOf("delivery failed") >= 0, "Failed delivery is labelled as such")
+          check(panel.attention >= 1, "Failed delivery lights the attention dot")
+          failedAt = failed.updated_at
+          panel.act(agentId, "retry")
+          stage = 9
+        } else if (stage === 9 && panel.rows.some(function(r) { return r.id === agentId && r.delivery === "failed" && r.updated_at > failedAt })) {
+          check(true, "Retry delivery repeats the hand-over and reports the new outcome")
           report(true, "Native UI smoke checks passed")
         }
       } catch (e) { report(false, e.message) }

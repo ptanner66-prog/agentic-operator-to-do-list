@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "portertanner.operator-todos",
   "name": "Agentic Operator To Do List",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "author": "Porter Tanner",
   "description": "Beta agent decision inbox for Omarchy: review context, approve or reply from the bar, and keep short-term and long-term to-dos.",
   "license": "MIT",

@@ -7,9 +7,11 @@ context, recommendation, and consequences, then approve, reject, or reply from
 the panel. Short-term and long-term lists also hold the to-dos you explicitly
 ask agents to add.
 
-Version 0.2.1 is a beta release. The native list and local MCP flow are tested.
-Idle Codex resumption passed a live test on desktop build `26.901.51231`; its
-internal desktop interface remains experimental and version-sensitive.
+Version 0.2.2 is a beta release. The native list and local MCP flow are tested.
+Idle Codex resumption passed a live test on desktop build `26.901.51231` with
+0.2.1; its internal desktop interface remains experimental and version-sensitive.
+An independent adversarial review on 2026-09-13 found five beta blockers, and
+0.2.2 fixes them; see `REVIEW.md`.
 
 ![Native Omarchy decision panel with context and reply controls](preview.png)
 
@@ -25,8 +27,8 @@ the MCP reply/acknowledgement flow; it does not verify idle Codex resumption.
 </details>
 
 Click the checklist icon to open the list. A small red dot in its upper-right
-corner appears while the panel is closed when a request or failed reply delivery
-needs you. Green connection dots appear only in **Agents**. There are no
+corner appears while the panel is closed when a request, a failed reply delivery,
+or a reply unacknowledged for 15 minutes needs you. Green connection dots appear only in **Agents**. There are no
 notification popups or badge counts; the tabs read **Short term** and **Long term**.
 The panel always opens to its full size, fitted to your screen. The header and Add
 field stay in place while the list scrolls with the wheel, trackpad, scrollbar,
@@ -52,6 +54,12 @@ or Page Up / Page Down.
   **Move back to list**. It reopens in its original short- or long-term list.
   Agent requests need a fresh response; moving back does not undo work already done.
 - **Snooze:** silence an open agent request's dot for one hour.
+- **Retry delivery:** an answered request that is still unacknowledged after a
+  hand-over, a send, or a failed send can be resent from its expanded row, where
+  the failure reason is shown. A hand-over or send with no acknowledgement for
+  15 minutes after that delivery turns red and lights the bar dot. A successful
+  retry starts a new acknowledgement window. The row also names the
+  conversation the reply belongs to.
 
 The first important decision opens its details when you open the list. Nothing
 executes merely because an agent creates a request. A reply records the operator's
@@ -97,6 +105,8 @@ it does not mean every conversation has loaded the tools or can be awakened.
 After upgrading from 0.2.0, reconnect each app's MCP tools after active work
 finishes so its server can report live status. Existing servers keep their old
 code until reconnected. **Repair** updates setup; it does not restart the app.
+After upgrading to 0.2.2, click **Repair** for each connected app once so its
+session hooks move to the removal-safe launcher described under Storage and removal.
 
 Use `python3 install.py --connect hermes` to connect the local Hermes installation
 and its existing profiles. Remote bots remain a separate connection.
@@ -152,9 +162,10 @@ desktop app's local IPC socket. It does not start a second Codex instance.
 The desktop adapter uses an internal, version-sensitive protocol observed in
 desktop build `26.901.51231`. This is not a stable public API. It needs a loaded
 conversation owner and may stop working after an app update. An unavailable owner,
-timeout, or delivery error leaves the reply visible with a red dot. Uncertain
-sends are not automatically retried. Open the original chat to check it before
-resending. “Sent” means accepted by the app; “Agent acknowledged” requires an
+timeout, or delivery error leaves the reply visible with a red dot and its reason
+in the expanded row. Uncertain sends are not automatically retried. Open the
+original chat to check it, then use **Retry delivery** if needed. “Sent” means
+accepted by the app; “Agent acknowledged” requires an
 explicit acknowledgement from the agent. It does not claim that work has resumed
 solely because a socket write succeeded.
 
@@ -205,7 +216,26 @@ Do not invent conversation identifiers. Codex links can be derived from its UUID
 - `operator_wait`: wait up to 55 seconds for a response; other calls remain responsive.
 - `operator_ack`: acknowledge the exact `response_id` after reading it.
 
-Agents get no approval, deletion, or operator-response MCP tool. A cancelled or
+`operator_get`, `operator_wait`, and `operator_ack` accept the caller's `session_id`.
+All three MCP tools require a matching session ID when the request names a
+conversation; omitting it is an error. Requests without a conversation ID remain
+usable without one. These are routing checks on caller-supplied IDs, not
+authenticated isolation between same-user agents. A repost under an existing
+`request_key` whose title, kind, context, recommendation, consequence, or options
+differ returns the stored request with `mismatch: true` while it is open, and is
+refused once the operator has reviewed it. Titles, options, and IDs are reduced to
+one line and control characters are removed, so agent text cannot forge lines in a
+delivered reply; the delivered Codex turn states the operator's response first and
+quotes the agent's title last. The Codex CLI fallback refuses an explicit
+`session_id` that differs from the thread's real `CODEX_THREAD_ID`. A cancelled
+`operator_wait` ends without a result and leaves the reply deliverable; a hand-over
+is recorded only after the result was written to the waiting agent.
+
+Agents get no approval, deletion, or operator-response MCP tool. That is a
+convenience, not a security boundary: the boundary is this standing policy plus
+each app's own permission prompts. Any process running as your user, including an
+agent's shell, could run the human-facing `act` command, so give agents only the
+shell access you already trust them with. A cancelled or
 dismissed request never grants authorization. Several chats may write concurrently;
 SQLite transactions prevent lost writes. Reposting a request cannot silently change
 the action being approved. A materially different decision needs a new request key.
@@ -242,13 +272,20 @@ Data lives in `$XDG_DATA_HOME/operator-todos/todos.sqlite3`, defaulting to
 directory for isolated tests. Keep the database and its WAL together for live backups.
 
 Disable the widget with `omarchy plugin disable portertanner.operator-todos`. Removing
-the plugin does not delete the database or silently erase your tasks. To disconnect
-agents before removing it, run:
+the plugin does not delete the database or silently erase your tasks. **Disconnect
+the apps first**, with **Disconnect all apps** in the panel's Agents view or:
 
 ```bash
 python3 install.py --disconnect codex claude hermes
 omarchy plugin remove portertanner.operator-todos
 ```
+
+`omarchy plugin remove` only deletes the plugin folder. Without disconnecting, each
+app keeps an MCP entry that points at a missing file. Session hooks are safe either
+way since 0.2.2: they run through `~/.config/omarchy/operator-todos/session-hook.py`,
+which exits quietly when the plugin is absent. Hooks installed by 0.2.1 pointed into
+the plugin folder and blocked every Claude Code prompt after removal, so **Repair**
+each app once after upgrading; Codex then asks you to trust the changed hook.
 
 Disconnect removes this plugin's MCP entries, lifecycle hooks and marked policy
 blocks while retaining other configuration and the saved list. Backups sit beside
@@ -266,13 +303,19 @@ python3 tests/run_fresh_install.py
 
 Tests cover concurrent writes, duplicate requests, context requirements, dismissal,
 deletion, short/long-term movement, exact-response acknowledgement, delivery failures,
-and an actual stdio MCP round trip. Setup tests cover repeated installation,
+and an actual stdio MCP round trip. `tests/test_blockers.py` covers the five review
+blockers: the removal-safe hook launcher, cancelled waits and retry, single-line
+agent text and thread-bound Codex posts, session-bound acknowledgement, and
+mismatched reposts. Setup tests cover repeated installation,
 global overrides, existing hooks, collisions, profile preservation, disconnect,
 unusual TOML layouts, and rollback after failed writes. Presence tests cover actual
 MCP connect/disconnect, crashes, stale heartbeats, and independent clients.
 The native smoke test temporarily loads the real panel into the existing shell,
 uses an isolated database, and exercises Add, Enter, failure recovery, History,
-count-free tab labels, and connection/attention indicator behavior.
+count-free tab labels, connection/attention indicator behavior, and an agent
+request whose desktop delivery fails closed: the reason is kept for the row, the
+dot lights, and **Retry delivery** repeats the hand-over. It points the Codex
+adapter at an empty `CODEX_HOME`, so no real desktop app is contacted.
 It never opens a window or sends physical keystrokes. Live desktop testing is still
 necessary when updating the Codex IPC adapter. See `PUBLISHING.md` for release checks.
 
@@ -282,7 +325,8 @@ settings and a Hermes fixture when PyYAML is available, checks installed command
 and MCP initialization, and disconnects while retaining the database. It uses an
 existing Omarchy host; it is not a fresh operating-system or live desktop-app test.
 
-All 31 Python tests pass on the recorded Omarchy host. The two subprocess-presence
+Recorded Omarchy-host results and the later merge-review results are distinguished
+in `REVIEW.md` and `verification.json`. The two subprocess-presence
 tests require Linux procfs to expose child-process identities. Restricted or
 virtualized execution environments may report those differently; investigate
 such failures on the supported host rather than interpreting them as a verified
