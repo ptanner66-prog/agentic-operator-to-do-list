@@ -1,0 +1,45 @@
+{
+  "version": "0.2.1",
+  "release_status": "beta",
+  "reviewed_on": "2026-09-13",
+  "plugin_id": "portertanner.operator-todos",
+  "python_tests": 31,
+  "native_ui_checks": 22,
+  "manifest_validation": "passed",
+  "static_lint": {
+    "syntax_errors": 0,
+    "missing_property_warnings": 50,
+    "unqualified_access_warnings": 94,
+    "signal_metadata_warnings": 2,
+    "unused_import_info": 1
+  },
+  "native_checks": [
+    "Empty Add focuses input and creates no task",
+    "Add and Enter persist tasks and clear input",
+    "Failed save retains draft, shows error, and enables retry",
+    "History restore returns item to the list",
+    "Agents setup statuses load",
+    "Short term and Long term labels have no counts",
+    "Green is based on live agent presence in Agents",
+    "A live connection alone does not light the bar icon",
+    "Red attention dot appears only while panel is closed",
+    "Cleared attention removes the red dot"
+  ],
+  "review_fixes": [
+    "Live per-client presence with exit and heartbeat expiry checks",
+    "Preserve unrelated indented or quoted Codex TOML tables; reject ambiguous edits",
+    "Stage setup edits and roll back failed commits",
+    "Reject desktop replies without a conversation owner",
+    "Close desktop socket when initialization fails"
+  ],
+  "remaining_app_steps": [
+    "Reconnect older MCP servers to enable live status",
+    "Codex session hooks require its normal native hook review"
+  ],
+  "limitations": [
+    "Codex idle auto-resume uses private IPC and still needs a live delivery/acknowledgement test",
+    "Idle Claude Chat and Hermes replies require a resumed conversation",
+    "Fresh-machine installation and other runtime versions were not verified in this review",
+    "Configuration and standing policy cannot guarantee model compliance"
+  ]
+}
