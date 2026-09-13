@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "checkout_commit": "f71ec155e0ceda1731b98a536ce8a1de6e329d3b",
-  "version": "0.2.1",
+  "checkout_commit": "396f575416aa8c685cc2fd11b3fc24e5b5499049",
+  "version": "0.2.2",
   "scope": "Clean Git checkout and isolated per-user installation on an existing Omarchy host; not a fresh operating system",
   "configured_sources": [
     "codex",
