@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "portertanner.operator-todos",
-  "name": "Operator To-dos",
+  "name": "Agentic Operator To Do List",
   "version": "0.2.1",
   "author": "Porter Tanner",
   "description": "A minimal short-term and long-term to-do list with contextual agent decisions, quick replies, and a quiet attention dot.",
@@ -9,7 +9,7 @@
   "kinds": ["bar-widget"],
   "entryPoints": {"barWidget": "BarWidget.qml"},
   "barWidget": {
-    "displayName": "Operator To-dos",
+    "displayName": "Agentic Operator To Do List",
     "description": "Your to-dos and important decisions from connected agents.",
     "category": "Productivity",
     "defaultSection": "right",

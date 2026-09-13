@@ -35,7 +35,7 @@ BarWidget {
     bar: root.bar
     text: "\uf0ae"
     fontSize: Style.font.icon
-    tooltipText: loader.item && loader.item.attention > 0 ? "To-dos · Needs your attention" : "To-dos"
+    tooltipText: loader.item && loader.item.attention > 0 ? "Agentic Operator To Do List · Needs your attention" : "Agentic Operator To Do List"
     onPressed: function(mouseButton) { if (mouseButton === Qt.LeftButton) root.toggle() }
     Accessible.role: Accessible.Button
     Accessible.name: tooltipText

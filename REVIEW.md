@@ -57,7 +57,7 @@ runtime versions have not been verified in this review.
    Review Codex hooks through its native hook review. App-specific instruction
    files and hooks guide agents but cannot guarantee every model follows policy.
 
-Source repository: [ptanner66-prog/omarchy-operator-todos](https://github.com/ptanner66-prog/omarchy-operator-todos).
+Source repository: [ptanner66-prog/agentic-operator-to-do-list](https://github.com/ptanner66-prog/agentic-operator-to-do-list).
 No marketplace submission has been made. The permanent third-party ID is
 `portertanner.operator-todos`; marketplace
 publication is subject to maintainer review and does not imply first-party status.

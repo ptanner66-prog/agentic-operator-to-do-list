@@ -1,4 +1,4 @@
-# Operator To-dos
+# Agentic Operator To Do List
 
 A minimal Omarchy bar plugin for short-term and long-term to-dos, important
 operator decisions, and tasks you explicitly ask your agents to add.
@@ -50,15 +50,15 @@ already required by Hermes (Arch package `python-yaml`).
 Install directly with Omarchy:
 
 ```bash
-omarchy plugin add https://github.com/ptanner66-prog/omarchy-operator-todos --enable
+omarchy plugin add https://github.com/ptanner66-prog/agentic-operator-to-do-list --enable
 ```
 
 Then open **Agents** in the panel to connect your apps. To work from a source
 checkout instead:
 
 ```bash
-git clone https://github.com/ptanner66-prog/omarchy-operator-todos.git
-cd omarchy-operator-todos
+git clone https://github.com/ptanner66-prog/agentic-operator-to-do-list.git
+cd agentic-operator-to-do-list
 python3 install.py
 ```
 

@@ -1,4 +1,4 @@
-# Publishing Operator To-dos
+# Publishing Agentic Operator To Do List
 
 Developed for Omarchy Quattro, following the
 [development guide](https://plugins.omarchy.org/develop.html) and
@@ -42,7 +42,7 @@ have the limits documented in README.
 ## Submit
 
 The public source repository is
-[ptanner66-prog/omarchy-operator-todos](https://github.com/ptanner66-prog/omarchy-operator-todos).
+[ptanner66-prog/agentic-operator-to-do-list](https://github.com/ptanner66-prog/agentic-operator-to-do-list).
 The manifest uses the permanent publisher namespace `portertanner.operator-todos`;
 the reserved `omarchy.*` namespace is not used. Submit the repository URL through
 the publishing guide's issue form when ready. Maintainers review the listing.

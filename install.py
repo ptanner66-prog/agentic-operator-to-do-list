@@ -117,7 +117,7 @@ def instructions(path, remove=False):
         return
     old = strip_instruction(path.read_text() if path.exists() else '')
     addition = '' if remove else (f'{MARKER_START}\n' + policy(DEST, PYTHON)
-        + f'\nShared policy maintained by Operator To-dos: {POLICY_DIR / "AGENTS.md"}.\n{MARKER_END}\n')
+        + f'\nShared policy maintained by Agentic Operator To Do List: {POLICY_DIR / "AGENTS.md"}.\n{MARKER_END}\n')
     result = old + ('\n\n' if old and addition else '\n' if old else '') + addition
     write(path, result)
 
