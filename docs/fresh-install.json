@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "checkout_commit": "f71ec155e0ceda1731b98a536ce8a1de6e329d3b",
+  "version": "0.2.1",
+  "scope": "Clean Git checkout and isolated per-user installation on an existing Omarchy host; not a fresh operating system",
+  "configured_sources": [
+    "codex",
+    "claude",
+    "hermes"
+  ],
+  "checks": [
+    "Manifest validates before and after install",
+    "Empty app configs gain working MCP and policy setup",
+    "No real bar or app config changed",
+    "Installed backend persists a long-term task and restores it from history",
+    "Installed stdio MCP initializes and exposes agent tools",
+    "Disconnect removes integration entries and retains the database"
+  ]
+}

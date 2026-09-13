@@ -41,10 +41,27 @@ resumed conversation to consume a saved answer.
   shell and forwards its lifecycle; no second Quickshell process is started.
 - QML static analysis reports existing dynamic-property, unqualified-access,
   and installed signal-metadata warnings. It is not a warning-free lint result.
+- A clean clone of public commit `f71ec15` installed successfully into isolated
+  user/config/data directories. Empty Codex/Claude settings and a minimal Hermes
+  fixture were connected; installed CLI persistence, MCP initialization, restore,
+  disconnect, and database retention checks passed. See `docs/fresh-install.json`.
+- The 30-second native UI demo completed an actual MCP post → wait → response →
+  exact-response acknowledgement cycle against an isolated database. Its client
+  and UI clicks are scripted. This establishes the MCP path, not live LLM or idle
+  desktop resumption. Screenshot and recording contain only demo data.
 
-Testing host: Omarchy 4.0.3 / Quattro, Qt 6.11.2, Python 3.14. The supported Python
-minimum is 3.11. Hermes setup also needs PyYAML. A fresh-machine install and other
-runtime versions have not been verified in this review.
+A separate reviewer reported 28/31 tests passing in a restricted environment.
+All 31 passed again on this Omarchy host. The socket-cleanup unit test now mocks
+its endpoint, removing an unnecessary bind permission dependency. The two child
+process-presence failures were not reproduced here; those integration tests
+depend on Linux procfs accurately exposing child identities and remain enabled.
+
+Testing host: Omarchy 4.0.3-1 / Quattro, Quickshell 0.3.1-1, Qt 6.11.2-3,
+Python 3.14.7-1. Installed desktop packages are Codex 26.901.51231-1,
+Claude 1.49585.0-1, and Hermes 2026.8.31-3. Installed versions alone do not establish
+successful reply delivery in those apps. The supported Python minimum is 3.11;
+Hermes setup also needs PyYAML. A fresh operating-system install and other runtime
+versions have not been verified in this review.
 
 ## Before claiming stable desktop integration
 

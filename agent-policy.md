@@ -1,6 +1,6 @@
 # Agentic Operator To Do List
 
-Use the shared Omarchy Agentic Operator To Do List list whenever the user explicitly asks
+Use Agentic Operator To Do List in Omarchy whenever the user explicitly asks
 you to add a to-do, or an IMPORTANT operator decision blocks authorized work:
 direction, scope, cost, external commitments, or a consequential blocker.
 Handle routine authorized work yourself. Do not fill the list with progress

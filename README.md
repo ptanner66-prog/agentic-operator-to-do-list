@@ -1,10 +1,27 @@
 # Agentic Operator To Do List
 
-A minimal Omarchy bar plugin for short-term and long-term to-dos, important
-operator decisions, and tasks you explicitly ask your agents to add.
+**Your agents' decision inbox, in the Omarchy bar.**
+
+Keep important decisions from Codex, Claude, and Hermes in one place. Read the
+context, recommendation, and consequences, then approve, reject, or reply from
+the panel. Short-term and long-term lists also hold the to-dos you explicitly
+ask agents to add.
 
 Version 0.2.1 is a beta release. The native list and local MCP flow are tested;
 automatic resumption of idle Codex desktop conversations remains experimental.
+
+![Native Omarchy decision panel with context and reply controls](preview.png)
+
+<details>
+<summary>Watch the 30-second demo</summary>
+
+![Native UI demo: agent request, operator reply, and MCP acknowledgement](docs/demo.gif)
+
+[Download the MP4](docs/demo.mp4). This recording uses the real native UI, an
+isolated database, a scripted MCP client, and automated button clicks. It verifies
+the MCP reply/acknowledgement flow; it does not verify idle Codex resumption.
+
+</details>
 
 Click the checklist icon to open the list. A small red dot in its upper-right
 corner appears while the panel is closed when a request or failed reply delivery
@@ -234,6 +251,7 @@ Edit `agent-policy.md` in your checkout and reconnect to distribute policy chang
 python3 -m unittest discover -s tests -v
 omarchy plugin validate .
 python3 tests/run_native_smoke.py
+python3 tests/run_fresh_install.py
 ```
 
 Tests cover concurrent writes, duplicate requests, context requirements, dismissal,
@@ -247,6 +265,19 @@ uses an isolated database, and exercises Add, Enter, failure recovery, History,
 count-free tab labels, and connection/attention indicator behavior.
 It never opens a window or sends physical keystrokes. Live desktop testing is still
 necessary when updating the Codex IPC adapter. See `PUBLISHING.md` for release checks.
+
+The fresh-install check clones the public repository into a temporary directory,
+installs into isolated user/config/data directories, connects empty Codex/Claude
+settings and a Hermes fixture when PyYAML is available, checks installed commands
+and MCP initialization, and disconnects while retaining the database. It uses an
+existing Omarchy host; it is not a fresh operating-system or live desktop-app test.
+
+All 31 Python tests pass on the recorded Omarchy host. The two subprocess-presence
+tests require Linux procfs to expose child-process identities. Restricted or
+virtualized execution environments may report those differently; investigate
+such failures on the supported host rather than interpreting them as a verified
+desktop result. The socket-cleanup unit test uses a mock endpoint and does not
+require permission to bind a local socket.
 
 ## License
 

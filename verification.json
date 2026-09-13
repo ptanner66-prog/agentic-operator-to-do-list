@@ -41,5 +41,21 @@
     "Idle Claude Chat and Hermes replies require a resumed conversation",
     "Fresh-machine installation and other runtime versions were not verified in this review",
     "Configuration and standing policy cannot guarantee model compliance"
-  ]
+  ],
+  "clean_install": {
+    "passed": true,
+    "checkout_commit": "f71ec155e0ceda1731b98a536ce8a1de6e329d3b",
+    "report": "docs/fresh-install.json",
+    "scope": "Clean checkout and isolated per-user directories on the existing Omarchy host; not a fresh OS"
+  },
+  "demo": {
+    "duration_seconds": 30,
+    "native_ui": true,
+    "isolated_data": true,
+    "client": "Scripted MCP client",
+    "ui_actions": "Automated button clicks",
+    "response_acknowledged": true,
+    "verifies_idle_desktop_resume": false
+  },
+  "test_environment_followup": "All 31 pass on Omarchy. Socket-cleanup unit test now uses a mock endpoint. Reported child-process presence failures were not reproduced; real procfs integration checks remain enabled."
 }

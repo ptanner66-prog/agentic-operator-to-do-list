@@ -18,6 +18,7 @@ for the checks completed and integration tests still needed before a stable clai
 omarchy plugin validate .
 python3 -m unittest discover -s tests -v
 python3 tests/run_native_smoke.py
+python3 tests/run_fresh_install.py
 ```
 
 Also run `qmllint` with the installed shell import path, as described in the
@@ -47,6 +48,11 @@ The manifest uses the permanent publisher namespace `portertanner.operator-todos
 the reserved `omarchy.*` namespace is not used. Submit the repository URL through
 the publishing guide's issue form when ready. Maintainers review the listing.
 A marketplace listing does not make the plugin a bundled first-party component.
+
+Use `MARKETPLACE.md` as the listing draft. `preview.png` is the native UI preview;
+the README includes a 30-second GIF/MP4 demo. The demo uses a scripted MCP client
+and automated UI clicks. Keep that distinction and the idle-agent beta limits
+visible when sharing it.
 
 The distributable contains no personal to-dos, credentials, app configuration,
 machine-specific paths, or database. Do not add any of those to the repository.

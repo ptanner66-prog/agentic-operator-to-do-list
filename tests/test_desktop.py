@@ -1,9 +1,10 @@
 import json
+import os
 from pathlib import Path
-import socket
+import stat
 import struct
 import sys
-import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -32,17 +33,17 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(params['turnStart']['request']['input'][0]['text'], 'Exact response')
 
     def test_failed_initialize_closes_socket(self):
-        with tempfile.TemporaryDirectory() as directory:
-            endpoint = Path(directory) / 'test.sock'
-            listener = socket.socket(socket.AF_UNIX)
-            self.addCleanup(listener.close)
-            listener.bind(str(endpoint))
-            endpoint.chmod(0o600)
-            fake = mock.Mock()
-            with mock.patch('codex_desktop.socket.socket', return_value=fake), mock.patch.object(Desktop, 'request', side_effect=RuntimeError('changed protocol')):
-                with self.assertRaises(RuntimeError):
-                    Desktop(endpoint)
-            fake.close.assert_called_once()
+        endpoint = Path('/test-operator-inbox/ipc.sock')
+        def metadata(path):
+            kind = stat.S_IFSOCK if path == endpoint else stat.S_IFDIR
+            return SimpleNamespace(st_uid=os.getuid(), st_mode=kind | 0o700)
+        fake = mock.Mock()
+        # This checks cleanup after protocol failure, so no real listening socket
+        # is needed. Restricted CI must still exercise the cleanup assertion.
+        with mock.patch.object(Path, 'stat', metadata), mock.patch('codex_desktop.socket.socket', return_value=fake), mock.patch.object(Desktop, 'request', side_effect=RuntimeError('changed protocol')):
+            with self.assertRaises(RuntimeError):
+                Desktop(endpoint)
+        fake.close.assert_called_once()
 
     def test_fragmented_frames_and_oversize_rejection(self):
         desktop = Desktop.__new__(Desktop)

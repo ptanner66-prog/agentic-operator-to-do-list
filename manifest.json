@@ -4,13 +4,13 @@
   "name": "Agentic Operator To Do List",
   "version": "0.2.1",
   "author": "Porter Tanner",
-  "description": "A minimal short-term and long-term to-do list with contextual agent decisions, quick replies, and a quiet attention dot.",
+  "description": "Beta agent decision inbox for Omarchy: review context, approve or reply from the bar, and keep short-term and long-term to-dos.",
   "license": "MIT",
   "kinds": ["bar-widget"],
   "entryPoints": {"barWidget": "BarWidget.qml"},
   "barWidget": {
     "displayName": "Agentic Operator To Do List",
-    "description": "Your to-dos and important decisions from connected agents.",
+    "description": "Beta inbox for important agent decisions, contextual replies, and your to-dos.",
     "category": "Productivity",
     "defaultSection": "right",
     "allowMultiple": false
