@@ -1,17 +1,22 @@
 {
-  "version": "0.2.1",
+  "version": "0.2.2",
   "release_status": "beta",
   "reviewed_on": "2026-09-13",
   "plugin_id": "portertanner.operator-todos",
-  "python_tests": 31,
+  "python_tests": 42,
   "native_ui_checks": 22,
   "manifest_validation": "passed",
-  "static_lint": {
-    "syntax_errors": 0,
-    "missing_property_warnings": 50,
-    "unqualified_access_warnings": 94,
-    "signal_metadata_warnings": 2,
-    "unused_import_info": 1
+  "independent_review": {
+    "date": "2026-09-13",
+    "reviewed_commit": "986b76bcb42efb7c211c8a3f96d747b75bce1fa8",
+    "verdict_for_0_2_1": "publish beta after five fixes; hold stable",
+    "blockers_fixed_in_0_2_2": [
+      "Removal-safe session hook launcher outside the plugin folder; Disconnect and Disconnect all in Agents",
+      "Cancelled operator_wait ends silently and keeps the reply deliverable; receipt recorded after the result is written; Retry delivery; stale hand-overs raise attention",
+      "Single-line agent text without control characters; operator response first and agent title quoted last in delivered Codex turns; target conversation shown; Codex CLI rejects a foreign session_id",
+      "operator_get, operator_wait, and operator_ack are bound to the originating session",
+      "Changed reposts under an existing request_key are flagged while open and refused after review"
+    ]
   },
   "native_checks": [
     "Empty Add focuses input and creates no task",
@@ -25,7 +30,7 @@
     "Red attention dot appears only while panel is closed",
     "Cleared attention removes the red dot"
   ],
-  "review_fixes": [
+  "review_fixes_0_2_1": [
     "Live per-client presence with exit and heartbeat expiry checks",
     "Preserve unrelated indented or quoted Codex TOML tables; reject ambiguous edits",
     "Stage setup edits and roll back failed commits",
@@ -34,17 +39,19 @@
   ],
   "remaining_app_steps": [
     "Reconnect older MCP servers to enable live status",
+    "Repair each connected app once after upgrading so hooks use the launcher",
     "Codex session hooks require its normal native hook review"
   ],
   "limitations": [
-    "Codex idle resumption passed on desktop build 26.901.51231 but uses private IPC and needs repeat testing after updates",
-    "Idle Claude Chat and Hermes replies require a resumed conversation",
-    "Fresh-machine installation and other runtime versions were not verified in this review",
+    "Codex idle resumption passed on desktop build 26.901.51231 with 0.2.1; the delivered message text changed in 0.2.2 and the private IPC needs repeat testing after updates",
+    "Idle Claude Chat and Hermes replies require a resumed conversation; neither has been exercised live on the recorded host",
+    "The operator boundary is standing policy plus each app's own permission prompts; any same-user process can run the act CLI",
+    "Fresh-machine installation and other runtime versions were not verified",
     "Configuration and standing policy cannot guarantee model compliance"
   ],
   "clean_install": {
     "passed": true,
-    "checkout_commit": "f71ec155e0ceda1731b98a536ce8a1de6e329d3b",
+    "checkout_commit": "986b76bcb42efb7c211c8a3f96d747b75bce1fa8",
     "report": "docs/fresh-install.json",
     "scope": "Clean checkout and isolated per-user directories on the existing Omarchy host; not a fresh OS"
   },
@@ -57,12 +64,13 @@
     "response_acknowledged": true,
     "verifies_idle_desktop_resume": false
   },
-  "test_environment_followup": "All 31 pass on Omarchy. Socket-cleanup unit test now uses a mock endpoint. Reported child-process presence failures were not reproduced; real procfs integration checks remain enabled.",
+  "test_environment_followup": "All 42 pass on Omarchy. Socket-cleanup unit test uses a mock endpoint. Real procfs integration checks remain enabled.",
   "live_codex_idle_resume": {
     "passed": true,
+    "plugin_version": "0.2.1",
     "codex_desktop": "26.901.51231-1",
     "report": "docs/live-codex-verification.json",
     "response_to_ack_seconds": 7.71,
-    "scope": "One real idle local task with a discoverable desktop owner; automated native QML approval and CLI fallback read/ack against isolated data"
+    "scope": "One real idle local task with a discoverable desktop owner; automated native QML approval and CLI fallback read/ack against isolated data; not repeated for 0.2.2"
   }
 }

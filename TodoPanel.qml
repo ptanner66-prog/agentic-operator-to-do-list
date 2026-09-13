@@ -75,12 +75,13 @@ Panel {
     return item.source === "manual" ? "" : item.source.charAt(0).toUpperCase() + item.source.slice(1) + (item.project ? " · " + item.project : "")
   }
   function deliveryLabel(item) {
+    if (item.status === "dismissed") return item.delivery === "acknowledged" ? "Dismissed · agent acknowledged" : "Dismissed"
     if (item.delivery === "acknowledged") return "Agent acknowledged"
-    if (item.delivery === "received") return "Received by agent"
+    if (item.unacknowledged) return (item.delivery === "sent" ? "Sent to conversation" : "Handed to waiting agent") + " · no acknowledgement yet, retry or check the chat"
+    if (item.delivery === "received") return "Handed to waiting agent"
     if (item.delivery === "sent") return "Sent to conversation"
-    if (item.delivery === "failed") return "Reply saved · delivery needs attention"
-    if (item.delivery === "saved") return "Reply saved · waiting for agent"
-    if (item.status === "dismissed") return "Dismissed"
+    if (item.delivery === "failed") return "Reply saved · delivery failed, see details"
+    if (item.delivery === "saved") return item.source === "codex" && !item.session_id ? "Reply saved · no conversation ID, the agent must read it" : "Reply saved · waiting for agent"
     if (item.snoozed_until > root.now) return "Snoozed for an hour"
     return ""
   }
@@ -116,7 +117,7 @@ Panel {
         else if (root.requestedCommand === "post") {
           if (addInput.text.trim() === root.submittedTitle) addInput.text = ""
           addInput.forceActiveFocus()
-        } else if (root.requestedCommand === "setup-status" || root.requestedCommand === "connect") {
+        } else if (root.requestedCommand === "setup-status" || root.requestedCommand === "connect" || root.requestedCommand === "disconnect") {
           root.agentStatus = result.result.agents
           root.setupMessage = result.result.message || ""
         }
@@ -311,7 +312,7 @@ Panel {
                     text: root.deliveryLabel(modelData)
                     textFormat: Text.PlainText
                     wrapMode: Text.Wrap
-                    color: modelData.delivery === "failed" ? Color.urgent : root.muted
+                    color: modelData.delivery === "failed" || modelData.unacknowledged ? Color.urgent : root.muted
                     font.family: Style.font.family
                     font.pixelSize: Style.font.bodySmall
                   }
@@ -368,6 +369,26 @@ Panel {
                   font.family: Style.font.family
                   font.pixelSize: Style.font.bodySmall
                 }
+                Text {
+                  visible: !!entry.modelData.delivery_error
+                  width: parent.width
+                  text: "Delivery problem: " + (entry.modelData.delivery_error || "")
+                  textFormat: Text.PlainText
+                  wrapMode: Text.Wrap
+                  color: Color.urgent
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.bodySmall
+                }
+                Text {
+                  visible: entry.isAgent
+                  width: parent.width
+                  text: entry.modelData.session_id ? "Conversation: " + entry.modelData.session_id : "No conversation ID was supplied; the agent must read the reply itself"
+                  textFormat: Text.PlainText
+                  wrapMode: Text.Wrap
+                  color: root.muted
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.bodySmall
+                }
                 Row {
                   visible: entry.isOpen && entry.modelData.kind === "approval"
                   spacing: Style.space(8)
@@ -405,6 +426,7 @@ Panel {
                   Button { visible: root.history; text: "Move back to list"; foreground: root.fg; fontSize: Style.font.bodySmall; focusable: true; enabled: !root.busy; onClicked: root.act(entry.modelData.id, "restore") }
                   Button { visible: !!entry.modelData.chat_url; text: "Open chat ↗"; foreground: root.muted; fontSize: Style.font.bodySmall; focusable: true; onClicked: Qt.openUrlExternally(entry.modelData.chat_url) }
                   Button { text: root.term === "short" ? "Move to long term" : "Move to short term"; foreground: root.muted; fontSize: Style.font.bodySmall; focusable: true; enabled: !root.busy; onClicked: root.act(entry.modelData.id, "move", {term: root.term === "short" ? "long" : "short"}) }
+                  Button { visible: entry.modelData.status === "answered" && ["received", "sent", "failed"].indexOf(entry.modelData.delivery) >= 0; text: "Retry delivery"; foreground: root.fg; fontSize: Style.font.bodySmall; focusable: true; enabled: !root.busy; onClicked: root.act(entry.modelData.id, "retry") }
                   Button { visible: entry.isOpen && entry.isAgent; text: "Snooze 1h"; foreground: root.muted; fontSize: Style.font.bodySmall; focusable: true; enabled: !root.busy; onClicked: root.act(entry.modelData.id, "snooze") }
                   Button { text: "Delete"; foreground: root.muted; fontSize: Style.font.bodySmall; focusable: true; enabled: !root.busy; onClicked: root.act(entry.modelData.id, "delete") }
                 }
@@ -438,8 +460,9 @@ Panel {
                 width: parent.width
                 spacing: Style.space(7)
                 Rectangle { width: Style.space(6); height: width; radius: width / 2; anchors.verticalCenter: parent.verticalCenter; color: root.agentConnected(agentRow.modelData.source) ? "#66bb6a" : root.muted; Accessible.name: root.agentConnected(agentRow.modelData.source) ? "Connected" : "Disconnected" }
-                Text { width: parent.width - connectButton.width - Style.space(20); anchors.verticalCenter: parent.verticalCenter; text: modelData.name; textFormat: Text.PlainText; color: root.fg; font.bold: true; font.family: Style.font.family; font.pixelSize: Style.font.body }
+                Text { width: parent.width - connectButton.width - disconnectButton.width - Style.space(27); anchors.verticalCenter: parent.verticalCenter; text: modelData.name; textFormat: Text.PlainText; color: root.fg; font.bold: true; font.family: Style.font.family; font.pixelSize: Style.font.body }
                 Button { id: connectButton; text: modelData.configured ? "Repair" : "Connect"; foreground: root.fg; bordered: true; focusable: true; enabled: !root.busy; onClicked: root.run("connect", {source: modelData.source}) }
+                Button { id: disconnectButton; visible: modelData.configured; width: visible ? implicitWidth : 0; text: "Disconnect"; foreground: root.muted; focusable: true; enabled: !root.busy; onClicked: root.run("disconnect", {sources: [modelData.source]}) }
               }
               Text { text: root.agentConnected(agentRow.modelData.source) ? "Connected" : "Disconnected"; color: root.agentConnected(agentRow.modelData.source) ? "#66bb6a" : root.muted; font.family: Style.font.family; font.pixelSize: Style.font.bodySmall }
               Text { width: parent.width; text: modelData.detail; textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.muted; font.family: Style.font.family; font.pixelSize: Style.font.bodySmall }
@@ -447,7 +470,12 @@ Panel {
             }
           }
           Text { width: parent.width; visible: root.setupMessage !== ""; text: root.setupMessage; textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.fg; font.family: Style.font.family; font.pixelSize: Style.font.bodySmall }
-          Button { text: "Refresh connections"; foreground: root.muted; focusable: true; enabled: !root.busy; onClicked: root.run("setup-status", {}) }
+          Text { width: parent.width; text: "Disconnect apps before removing the plugin so their MCP entries do not point at missing files. Hooks installed by this version exit quietly when the plugin is absent."; textFormat: Text.PlainText; wrapMode: Text.Wrap; color: root.muted; font.family: Style.font.family; font.pixelSize: Style.font.bodySmall }
+          Row {
+            spacing: Style.space(6)
+            Button { text: "Refresh connections"; foreground: root.muted; focusable: true; enabled: !root.busy; onClicked: root.run("setup-status", {}) }
+            Button { text: "Disconnect all apps"; foreground: root.muted; focusable: true; enabled: !root.busy; onClicked: root.run("disconnect", {}) }
+          }
         }
       }
     }

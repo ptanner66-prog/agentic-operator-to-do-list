@@ -11,8 +11,9 @@ instance or write into `/usr/share/omarchy`.
 
 ## Release validation
 
-The 0.2.1 candidate is labeled **beta**. See `REVIEW.md` and `verification.json`
-for the checks completed and integration tests still needed before a stable claim.
+The 0.2.2 candidate is labeled **beta**. See `REVIEW.md` and `verification.json`
+for the checks completed, the five review blockers fixed in 0.2.2, and the
+integration tests still needed before a stable claim.
 
 ```sh
 omarchy plugin validate .
@@ -28,7 +29,8 @@ warnings. Investigate syntax, type, and layout errors; check the running shell
 log as well as the static report.
 
 Check the bar on each display; open, close, Escape, reopen, disable/re-enable,
-and restart the shell. Check a fresh installation with no agent configuration,
+and restart the shell. Check that Agents → Disconnect all apps removes every MCP
+entry and hook, and that `omarchy plugin remove` afterwards leaves each app usable. Check a fresh installation with no agent configuration,
 then use Agents → Connect. Confirm Add, Enter, delete, dismiss, restore, short/long
 lists, long context scrolling, and the attention dot. The red dot belongs on the
 closed bar icon; green connection dots belong only in Agents. Use temporary data.

@@ -1,4 +1,47 @@
-# Release review · 0.2.1
+# Release review · 0.2.2
+
+## Independent review and 0.2.2 fixes
+
+An independent adversarial review of commit `986b76b` (0.2.1) on 2026-09-13
+re-ran the 31 Python tests, the 22 native checks, and the clean-install check,
+all passing, and then found five beta blockers by targeted reproduction. 0.2.2
+fixes each one, with regression tests in `tests/test_blockers.py`:
+
+1. **Uninstall lock-out.** `omarchy plugin remove` never runs plugin code, so the
+   `UserPromptSubmit` hook pointed at a missing script; Python exits 2 and Claude
+   Code blocks and erases every prompt (reproduced with `claude -p`). Hooks now run
+   `~/.config/omarchy/operator-todos/session-hook.py`, outside the plugin folder,
+   which exits 0 silently when the plugin is absent. Agents gained per-app
+   **Disconnect** and **Disconnect all apps**; disconnecting no longer creates files
+   for apps that were never configured.
+2. **Stranded answers.** `operator_wait` ignored `notifications/cancelled` and
+   marked delivery `received` before the result was written; the Codex dispatcher
+   only pushes `saved` replies. A cancelled wait now ends without a result and
+   clears its lease, receipt is recorded only after the result is written, and
+   an operator can **Retry delivery**. Unacknowledged hand-overs older than
+   15 minutes raise attention, and the failure reason is shown in the row.
+3. **Caller-controlled routing.** Any process could post `--source codex` with
+   another thread's ID, and a title with newlines could forge a `Response:` line
+   in the delivered turn. Titles, options, and IDs are now single-line without
+   control characters, the delivered turn states the operator's response first
+   and quotes the agent's title last, the row shows the target conversation, and
+   the Codex CLI refuses a `session_id` that differs from `CODEX_THREAD_ID`.
+4. **Wrong-session acknowledgement.** Any session of the same source could
+   acknowledge another session's answer. `operator_get`, `operator_wait`, and
+   `operator_ack` now take the caller's `session_id`; a mismatch is refused and
+   `operator_ack` requires it when the request names a conversation.
+5. **Silent key reuse.** A changed decision posted under an old key returned the
+   old approval with no signal. While open, a changed repost returns the stored
+   request with `mismatch: true`; once reviewed, it is refused.
+
+Also from the review, without a code change: the operator boundary is policy
+plus each app's own permission prompts, not the absence of an approval tool; the
+0.2.1 live Codex test used the earlier message text, so the desktop IPC path
+should be re-run before any stable claim; Claude Chat and Hermes have not been
+exercised live on the recorded host. The remaining review items are optional
+follow-ups.
+
+## 0.2.1 review
 
 Reviewed 2026-09-13 against the Omarchy
 [development](https://plugins.omarchy.org/develop.html) and

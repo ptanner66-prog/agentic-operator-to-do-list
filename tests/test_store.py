@@ -118,7 +118,9 @@ class InboxTests(unittest.TestCase):
             self.store.act(dict(id=r["id"], action="reply", text="Use the existing domain."))
             result = future.result(timeout=4)
         self.assertEqual(result["response"]["text"], "Use the existing domain.")
-        self.assertEqual(result["delivery"], "received")
+        # A bare wait never claims the agent received anything; the server records that after writing.
+        self.assertEqual(result["delivery"], "saved")
+        self.assertEqual(self.store.received(r["id"], result["response"]["id"])["delivery"], "received")
 
     def test_reply_is_sent_once_and_failed_send_stays_visible(self):
         r = self.store.post(dict(request_key="test", title="Review", kind="reply", term="short", context="Need final direction.", important=True, session_id="test"), "codex")
@@ -150,6 +152,10 @@ class InboxTests(unittest.TestCase):
         result = call(3, "tools/call", {"name": "operator_wait", "arguments": {"id": r["id"], "seconds": 1}})
         payload = json.loads(result["content"][0]["text"])
         self.assertEqual(payload["response"]["action"], "reject")
+        deadline = time.monotonic() + 3
+        while self.store.get(r["id"])["delivery"] != "received" and time.monotonic() < deadline:
+            time.sleep(.02)
+        self.assertEqual(self.store.get(r["id"])["delivery"], "received")
         p.stdin.close()
         p.wait(timeout=3)
         p.stdout.close()

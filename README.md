@@ -7,9 +7,11 @@ context, recommendation, and consequences, then approve, reject, or reply from
 the panel. Short-term and long-term lists also hold the to-dos you explicitly
 ask agents to add.
 
-Version 0.2.1 is a beta release. The native list and local MCP flow are tested.
-Idle Codex resumption passed a live test on desktop build `26.901.51231`; its
-internal desktop interface remains experimental and version-sensitive.
+Version 0.2.2 is a beta release. The native list and local MCP flow are tested.
+Idle Codex resumption passed a live test on desktop build `26.901.51231` with
+0.2.1; its internal desktop interface remains experimental and version-sensitive.
+An independent adversarial review on 2026-09-13 found five beta blockers, and
+0.2.2 fixes them; see `REVIEW.md`.
 
 ![Native Omarchy decision panel with context and reply controls](preview.png)
 
@@ -52,6 +54,11 @@ or Page Up / Page Down.
   **Move back to list**. It reopens in its original short- or long-term list.
   Agent requests need a fresh response; moving back does not undo work already done.
 - **Snooze:** silence an open agent request's dot for one hour.
+- **Retry delivery:** an answered request that is still unacknowledged after a
+  hand-over, a send, or a failed send can be resent from its expanded row, where
+  the failure reason is shown. A hand-over or send with no acknowledgement for
+  15 minutes turns red and lights the bar dot. The row also names the
+  conversation the reply belongs to.
 
 The first important decision opens its details when you open the list. Nothing
 executes merely because an agent creates a request. A reply records the operator's
@@ -97,6 +104,8 @@ it does not mean every conversation has loaded the tools or can be awakened.
 After upgrading from 0.2.0, reconnect each app's MCP tools after active work
 finishes so its server can report live status. Existing servers keep their old
 code until reconnected. **Repair** updates setup; it does not restart the app.
+After upgrading to 0.2.2, click **Repair** for each connected app once so its
+session hooks move to the removal-safe launcher described under Storage and removal.
 
 Use `python3 install.py --connect hermes` to connect the local Hermes installation
 and its existing profiles. Remote bots remain a separate connection.
@@ -152,9 +161,10 @@ desktop app's local IPC socket. It does not start a second Codex instance.
 The desktop adapter uses an internal, version-sensitive protocol observed in
 desktop build `26.901.51231`. This is not a stable public API. It needs a loaded
 conversation owner and may stop working after an app update. An unavailable owner,
-timeout, or delivery error leaves the reply visible with a red dot. Uncertain
-sends are not automatically retried. Open the original chat to check it before
-resending. “Sent” means accepted by the app; “Agent acknowledged” requires an
+timeout, or delivery error leaves the reply visible with a red dot and its reason
+in the expanded row. Uncertain sends are not automatically retried. Open the
+original chat to check it, then use **Retry delivery** if needed. “Sent” means
+accepted by the app; “Agent acknowledged” requires an
 explicit acknowledgement from the agent. It does not claim that work has resumed
 solely because a socket write succeeded.
 
@@ -205,6 +215,19 @@ Do not invent conversation identifiers. Codex links can be derived from its UUID
 - `operator_wait`: wait up to 55 seconds for a response; other calls remain responsive.
 - `operator_ack`: acknowledge the exact `response_id` after reading it.
 
+`operator_get`, `operator_wait`, and `operator_ack` accept the caller's `session_id`.
+When a request names a conversation, another session cannot read or acknowledge
+it, and `operator_ack` requires the session ID. A repost under an existing
+`request_key` whose title, kind, context, recommendation, consequence, or options
+differ returns the stored request with `mismatch: true` while it is open, and is
+refused once the operator has reviewed it. Titles, options, and IDs are reduced to
+one line and control characters are removed, so agent text cannot forge lines in a
+delivered reply; the delivered Codex turn states the operator's response first and
+quotes the agent's title last. The Codex CLI fallback refuses an explicit
+`session_id` that differs from the thread's real `CODEX_THREAD_ID`. A cancelled
+`operator_wait` ends without a result and leaves the reply deliverable; a hand-over
+is recorded only after the result was written to the waiting agent.
+
 Agents get no approval, deletion, or operator-response MCP tool. A cancelled or
 dismissed request never grants authorization. Several chats may write concurrently;
 SQLite transactions prevent lost writes. Reposting a request cannot silently change
@@ -242,13 +265,20 @@ Data lives in `$XDG_DATA_HOME/operator-todos/todos.sqlite3`, defaulting to
 directory for isolated tests. Keep the database and its WAL together for live backups.
 
 Disable the widget with `omarchy plugin disable portertanner.operator-todos`. Removing
-the plugin does not delete the database or silently erase your tasks. To disconnect
-agents before removing it, run:
+the plugin does not delete the database or silently erase your tasks. **Disconnect
+the apps first**, with **Disconnect all apps** in the panel's Agents view or:
 
 ```bash
 python3 install.py --disconnect codex claude hermes
 omarchy plugin remove portertanner.operator-todos
 ```
+
+`omarchy plugin remove` only deletes the plugin folder. Without disconnecting, each
+app keeps an MCP entry that points at a missing file. Session hooks are safe either
+way since 0.2.2: they run through `~/.config/omarchy/operator-todos/session-hook.py`,
+which exits quietly when the plugin is absent. Hooks installed by 0.2.1 pointed into
+the plugin folder and blocked every Claude Code prompt after removal, so **Repair**
+each app once after upgrading; Codex then asks you to trust the changed hook.
 
 Disconnect removes this plugin's MCP entries, lifecycle hooks and marked policy
 blocks while retaining other configuration and the saved list. Backups sit beside
@@ -266,7 +296,10 @@ python3 tests/run_fresh_install.py
 
 Tests cover concurrent writes, duplicate requests, context requirements, dismissal,
 deletion, short/long-term movement, exact-response acknowledgement, delivery failures,
-and an actual stdio MCP round trip. Setup tests cover repeated installation,
+and an actual stdio MCP round trip. `tests/test_blockers.py` covers the five review
+blockers: the removal-safe hook launcher, cancelled waits and retry, single-line
+agent text and thread-bound Codex posts, session-bound acknowledgement, and
+mismatched reposts. Setup tests cover repeated installation,
 global overrides, existing hooks, collisions, profile preservation, disconnect,
 unusual TOML layouts, and rollback after failed writes. Presence tests cover actual
 MCP connect/disconnect, crashes, stale heartbeats, and independent clients.
@@ -282,7 +315,7 @@ settings and a Hermes fixture when PyYAML is available, checks installed command
 and MCP initialization, and disconnects while retaining the database. It uses an
 existing Omarchy host; it is not a fresh operating-system or live desktop-app test.
 
-All 31 Python tests pass on the recorded Omarchy host. The two subprocess-presence
+All 42 Python tests pass on the recorded Omarchy host. The two subprocess-presence
 tests require Linux procfs to expose child-process identities. Restricted or
 virtualized execution environments may report those differently; investigate
 such failures on the supported host rather than interpreting them as a verified
