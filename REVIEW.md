@@ -1,5 +1,25 @@
 # Release review · 0.2.2
 
+## Merge-review follow-up
+
+The review of PR #1 at `0a1ce6b` reproduced two remaining functional defects:
+omitted session IDs bypassed MCP read/wait routing checks, and answers saved for
+over 15 minutes were marked stale immediately after their first delivery.
+All three conversation-bound MCP tools now require a matching session ID. A
+dedicated delivery timestamp starts the acknowledgement window after each
+hand-over or send, including retries; moving a task does not restart that timer.
+The session IDs are caller-supplied routing checks, not an authentication boundary.
+
+Generic MCP test clients now discard an ambient `CODEX_THREAD_ID`, while explicit
+binding tests can still supply one. Disconnect coverage works with and without
+optional PyYAML. The expanded suite has 46 tests. On the hosted Python 3.12.14
+review environment, 44 passed, including all 15 blocker regressions. The two
+unchanged child-process presence tests failed: a separate process probe confirmed
+that this environment retained a readable procfs identity after the child exited
+and was reaped. These failures are reported rather than skipped or weakened.
+The earlier Omarchy-host results below are author-recorded evidence. Native UI,
+fresh-install, and live desktop checks were not repeated in this environment.
+
 ## Independent review and 0.2.2 fixes
 
 An independent adversarial review of commit `986b76b` (0.2.1) on 2026-09-13
@@ -29,7 +49,7 @@ fixes each one, with regression tests in `tests/test_blockers.py`:
 4. **Wrong-session acknowledgement.** Any session of the same source could
    acknowledge another session's answer. `operator_get`, `operator_wait`, and
    `operator_ack` now take the caller's `session_id`; a mismatch is refused and
-   `operator_ack` requires it when the request names a conversation.
+   all three require it when the request names a conversation.
 5. **Silent key reuse.** A changed decision posted under an old key returned the
    old approval with no signal. While open, a changed repost returns the stored
    request with `mismatch: true`; once reviewed, it is refused.

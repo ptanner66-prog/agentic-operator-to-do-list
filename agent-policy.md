@@ -18,8 +18,9 @@ decision so retries cannot create duplicates or change an already reviewed actio
 
 At the start of a later turn, check `operator_list` for your session and read any
 responses with `operator_get`. Use `operator_wait` when you can wait for an answer
-now. Acknowledge the exact `response_id` with `operator_ack`, passing your own
-`session_id`, then continue within its scope. An unchecked, dismissed, deleted, or
+now. Pass your actual `session_id` to `operator_get`, `operator_wait`, and
+`operator_ack` whenever the request names a conversation. Acknowledge the exact
+`response_id`, then continue within its scope. An unchecked, dismissed, deleted, or
 rejected item is NOT approval. If `operator_post` returns `mismatch: true`, the
 operator reviews the stored text, not yours; a changed decision needs a new key.
 Never use the UI's `act` command or manufacture your own operator response.

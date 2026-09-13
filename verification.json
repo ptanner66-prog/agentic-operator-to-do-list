@@ -3,7 +3,7 @@
   "release_status": "beta",
   "reviewed_on": "2026-09-13",
   "plugin_id": "portertanner.operator-todos",
-  "python_tests": 42,
+  "python_tests": 46,
   "native_ui_checks": 30,
   "manifest_validation": "passed",
   "independent_review": {
@@ -55,7 +55,7 @@
   ],
   "clean_install": {
     "passed": true,
-    "checkout_commit": "986b76bcb42efb7c211c8a3f96d747b75bce1fa8",
+    "checkout_commit": "aefa42ac7dba523220e2baefea178019eb6a3345",
     "report": "docs/fresh-install.json",
     "scope": "Clean checkout and isolated per-user directories on the existing Omarchy host; not a fresh OS"
   },
@@ -68,7 +68,27 @@
     "response_acknowledged": true,
     "verifies_idle_desktop_resume": false
   },
-  "test_environment_followup": "All 42 Python tests and 30 native checks pass on Omarchy. Socket-cleanup unit test uses a mock endpoint. Real procfs integration checks remain enabled. The native delivery checks use an empty CODEX_HOME.",
+  "test_environment_followup": "The author recorded 42 passing Python tests and 30 native checks on Omarchy before the merge-review corrections. The current suite has 46 tests; see merge_review for the hosted follow-up results. Real procfs integration checks remain enabled.",
+  "merge_review": {
+    "base_pr_head": "0a1ce6b3ed09389b1a1e80e001fde1a924bbb403",
+    "python": "3.12.14",
+    "tests_run": 46,
+    "tests_passed": 44,
+    "tests_failed": 2,
+    "blocker_regressions_passed": 15,
+    "changes": [
+      "Require matching session IDs for conversation-bound MCP reads, waits, and acknowledgements",
+      "Start the acknowledgement timeout from each delivery, including retries",
+      "Isolate generic test clients from ambient Codex thread IDs",
+      "Exercise disconnect without optional PyYAML"
+    ],
+    "environment_failures": [
+      "test_crashed_server_is_disconnected_without_waiting_for_ttl",
+      "test_stdio_eof_removes_live_connection"
+    ],
+    "process_probe": "A child process still had a readable procfs identity after termination and wait() in the hosted environment.",
+    "native_and_live_checks_repeated": false
+  },
   "live_codex_idle_resume": {
     "passed": true,
     "plugin_version": "0.2.1",

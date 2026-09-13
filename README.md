@@ -57,7 +57,8 @@ or Page Up / Page Down.
 - **Retry delivery:** an answered request that is still unacknowledged after a
   hand-over, a send, or a failed send can be resent from its expanded row, where
   the failure reason is shown. A hand-over or send with no acknowledgement for
-  15 minutes turns red and lights the bar dot. The row also names the
+  15 minutes after that delivery turns red and lights the bar dot. A successful
+  retry starts a new acknowledgement window. The row also names the
   conversation the reply belongs to.
 
 The first important decision opens its details when you open the list. Nothing
@@ -216,8 +217,10 @@ Do not invent conversation identifiers. Codex links can be derived from its UUID
 - `operator_ack`: acknowledge the exact `response_id` after reading it.
 
 `operator_get`, `operator_wait`, and `operator_ack` accept the caller's `session_id`.
-When a request names a conversation, another session cannot read or acknowledge
-it, and `operator_ack` requires the session ID. A repost under an existing
+All three MCP tools require a matching session ID when the request names a
+conversation; omitting it is an error. Requests without a conversation ID remain
+usable without one. These are routing checks on caller-supplied IDs, not
+authenticated isolation between same-user agents. A repost under an existing
 `request_key` whose title, kind, context, recommendation, consequence, or options
 differ returns the stored request with `mismatch: true` while it is open, and is
 refused once the operator has reviewed it. Titles, options, and IDs are reduced to
@@ -322,7 +325,8 @@ settings and a Hermes fixture when PyYAML is available, checks installed command
 and MCP initialization, and disconnects while retaining the database. It uses an
 existing Omarchy host; it is not a fresh operating-system or live desktop-app test.
 
-All 42 Python tests pass on the recorded Omarchy host. The two subprocess-presence
+Recorded Omarchy-host results and the later merge-review results are distinguished
+in `REVIEW.md` and `verification.json`. The two subprocess-presence
 tests require Linux procfs to expose child-process identities. Restricted or
 virtualized execution environments may report those differently; investigate
 such failures on the supported host rather than interpreting them as a verified

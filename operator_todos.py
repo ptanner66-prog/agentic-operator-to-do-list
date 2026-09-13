@@ -203,8 +203,11 @@ class Store:
     @staticmethod
     def unacknowledged(item, now):
         response = item.get("response") or {}
+        # Older records lack delivery_at; their latest update is the best available
+        # hand-over timestamp until a new delivery records an explicit one.
+        delivered_at = item.get("delivery_at") or item.get("updated_at") or response.get("at", now)
         return (item["status"] == "answered" and item.get("delivery") in ("received", "sent")
-                and now - response.get("at", now) > UNACKNOWLEDGED_AFTER)
+                and now - delivered_at > UNACKNOWLEDGED_AFTER)
 
     def snapshot(self):
         with self.db() as db:
@@ -235,7 +238,7 @@ class Store:
             elif action == "restore":
                 if item["status"] not in ("done", "dismissed"):
                     raise ValueError("Only items in History can be moved back")
-                item.update(status="open", response=None, delivery="", delivery_error="",
+                item.update(status="open", response=None, delivery="", delivery_error="", delivery_at=0,
                             snoozed_until=0, waiting_until=0)
             elif action == "move":
                 if data.get("term") not in ("short", "long"):
@@ -249,7 +252,7 @@ class Store:
                 # The operator's decision is unchanged; only the hand-over is repeated.
                 if item["status"] != "answered" or item.get("delivery") not in ("received", "sent", "failed"):
                     raise ValueError("Only an answered request that is still unacknowledged can be resent")
-                item.update(delivery="saved", delivery_error="", waiting_until=0)
+                item.update(delivery="saved", delivery_error="", delivery_at=0, waiting_until=0)
             elif action in ("approve", "reject", "reply", "choose", "done", "dismiss"):
                 if item["status"] != "open":
                     raise ValueError("This item has already been handled")
@@ -267,6 +270,7 @@ class Store:
                 item["response"] = {"id": str(uuid.uuid4()), "action": action, "text": value, "at": time.time()}
                 item["status"] = "dismissed" if action == "dismiss" else ("done" if item["source"] == "manual" else "answered")
                 item["delivery"] = "saved" if item["source"] != "manual" else ""
+                item["delivery_at"] = 0
             else:
                 raise ValueError("Unknown action")
             self.save(db, item)
@@ -279,6 +283,8 @@ class Store:
                 return item
             if item["status"] != "deleted" and item.get("delivery") != "acknowledged":
                 item.update(delivery=state, delivery_error=error)
+                if state in ("received", "sent"):
+                    item["delivery_at"] = time.time()
                 self.save(db, item)
         return item
 
@@ -428,7 +434,7 @@ def serve_mcp(store, source):
                     item = store.get(args["id"])
                     if item["source"] != source:
                         raise ValueError("This request belongs to another integration")
-                    store.check_session(item, args.get("session_id"), require=name == "operator_ack")
+                    store.check_session(item, args.get("session_id"), require=True)
                     if name == "operator_get":
                         value = item
                     elif name == "operator_ack":

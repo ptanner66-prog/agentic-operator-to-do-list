@@ -149,7 +149,7 @@ class InboxTests(unittest.TestCase):
         self.assertFalse(any("approve" in t["name"] or "act" == t["name"] for t in tools))
         r = self.request()
         self.store.act(dict(id=r["id"], action="reject"))
-        result = call(3, "tools/call", {"name": "operator_wait", "arguments": {"id": r["id"], "seconds": 1}})
+        result = call(3, "tools/call", {"name": "operator_wait", "arguments": {"id": r["id"], "session_id": r["session_id"], "seconds": 1}})
         payload = json.loads(result["content"][0]["text"])
         self.assertEqual(payload["response"]["action"], "reject")
         deadline = time.monotonic() + 3

@@ -29,10 +29,13 @@ def request(**extra):
 class McpClient:
     """Minimal line-delimited JSON-RPC client for the real stdio server."""
 
-    def __init__(self, test, source, data):
+    def __init__(self, test, source, data, extra_env=None):
+        client_env = {key: value for key, value in os.environ.items() if key != "CODEX_THREAD_ID"}
+        client_env.update(OPERATOR_TODOS_DATA=data, PYTHONDONTWRITEBYTECODE="1")
+        client_env.update(extra_env or {})
         self.process = subprocess.Popen([sys.executable, str(ROOT / "operator_todos.py"), "mcp", "--source", source],
                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
-                                        env={**os.environ, "OPERATOR_TODOS_DATA": data, "PYTHONDONTWRITEBYTECODE": "1"})
+                                        env=client_env)
         test.addCleanup(self.close)
         self.count = 0
         self.call("initialize", {"protocolVersion": "2024-11-05", "clientInfo": {"name": "blocker-test"}})
@@ -75,7 +78,7 @@ class BlockerTests(unittest.TestCase):
     def test_cancelled_wait_emits_nothing_and_keeps_reply_deliverable(self):
         client = McpClient(self, "codex", self.temp.name)
         item = client.tool("operator_post", request(session_id=str(uuid.uuid4())))
-        wait_id = client.send("tools/call", {"name": "operator_wait", "arguments": {"id": item["id"], "seconds": 8}})
+        wait_id = client.send("tools/call", {"name": "operator_wait", "arguments": {"id": item["id"], "session_id": item["session_id"], "seconds": 8}})
         client.send("notifications/cancelled", {"requestId": wait_id, "reason": "user interrupted"}, with_id=False)
         time.sleep(.3)
         self.store.act(dict(id=item["id"], action="approve"))
@@ -106,6 +109,37 @@ class BlockerTests(unittest.TestCase):
         while self.store.get(item["id"])["delivery"] != "received" and time.monotonic() < deadline:
             time.sleep(.02)
         self.assertEqual(self.store.get(item["id"])["delivery"], "received")
+
+    def test_mcp_client_isolates_ambient_thread_and_can_test_explicit_binding(self):
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": "unrelated-parent-thread"}):
+            client = McpClient(self, "codex", self.temp.name)
+        self.assertEqual(client.tool("operator_post", request())["session_id"], "session-A")
+        bound = McpClient(self, "codex", self.temp.name, extra_env={"CODEX_THREAD_ID": "session-B"})
+        self.assertIn("does not match", bound.tool("operator_post", request())["error"])
+        self.assertEqual(bound.tool("operator_post", request(session_id="session-B"))["session_id"], "session-B")
+
+    def test_acknowledgement_timeout_starts_at_each_delivery(self):
+        for state in ("received", "sent"):
+            with self.subTest(state=state):
+                item = self.store.post(request(request_key=state), "claude")
+                with mock.patch("operator_todos.time.time", return_value=100):
+                    answered = self.store.act(dict(id=item["id"], action="approve"))
+                response_id = answered["response"]["id"]
+                with mock.patch("operator_todos.time.time", return_value=2000):
+                    self.store.mark_delivery(item["id"], state, response_id=response_id)
+                    fresh = next(i for i in self.store.snapshot()["items"] if i["id"] == item["id"])
+                self.assertFalse(fresh["unacknowledged"], "an old saved answer gets a full acknowledgement window after delivery")
+                with mock.patch("operator_todos.time.time", return_value=2800):
+                    self.store.act(dict(id=item["id"], action="move", term="long"))
+                with mock.patch("operator_todos.time.time", return_value=2901):
+                    stale = next(i for i in self.store.snapshot()["items"] if i["id"] == item["id"])
+                self.assertTrue(stale["unacknowledged"], "moving a task must not restart the delivery timer")
+                self.store.act(dict(id=item["id"], action="retry"))
+                with mock.patch("operator_todos.time.time", return_value=4000):
+                    self.store.mark_delivery(item["id"], state, response_id=response_id)
+                    retried = next(i for i in self.store.snapshot()["items"] if i["id"] == item["id"])
+                self.assertFalse(retried["unacknowledged"], "a fresh delivery after retry starts a new window")
+                self.assertEqual(retried["response"]["id"], response_id)
 
     def test_retry_resends_and_stale_handover_raises_attention(self):
         item = self.store.post(request(session_id=str(uuid.uuid4())), "codex")
@@ -188,10 +222,29 @@ class BlockerTests(unittest.TestCase):
         answered = self.store.act(dict(id=item["id"], action="approve"))
         response = answered["response"]["id"]
         self.assertIn("another conversation", second.tool("operator_get", {"id": item["id"], "session_id": "session-B"})["error"])
+        for name in ("operator_get", "operator_wait"):
+            with self.subTest(tool=name):
+                args = {"id": item["id"]}
+                if name == "operator_wait":
+                    args["seconds"] = 0
+                missing = second.tool(name, args)
+                self.assertIn("error", missing)
+                self.assertIn("session_id", missing["error"])
+                self.assertIn("another conversation", second.tool(name, {**args, "session_id": "session-B"})["error"])
+        self.assertEqual(self.store.get(item["id"])["delivery"], "saved")
+        self.assertEqual(first.tool("operator_get", {"id": item["id"], "session_id": "session-A"})["id"], item["id"])
         self.assertIn("another conversation", second.tool("operator_ack", {"id": item["id"], "response_id": response, "session_id": "session-B"})["error"])
         self.assertIn("session_id", second.tool("operator_ack", {"id": item["id"], "response_id": response})["error"])
         self.assertEqual(self.store.get(item["id"])["status"], "answered")
         self.assertEqual(first.tool("operator_ack", {"id": item["id"], "response_id": response, "session_id": "session-A"})["status"], "done")
+
+    def test_anonymous_requests_remain_readable_without_a_session(self):
+        client = McpClient(self, "claude", self.temp.name)
+        item = client.tool("operator_post", request(session_id=""))
+        answered = self.store.act(dict(id=item["id"], action="reject"))
+        self.assertEqual(client.tool("operator_get", {"id": item["id"]})["response"]["action"], "reject")
+        self.assertEqual(client.tool("operator_wait", {"id": item["id"], "seconds": 0})["response"]["action"], "reject")
+        self.assertEqual(client.tool("operator_ack", {"id": item["id"], "response_id": answered["response"]["id"]})["status"], "done")
 
     # Blocker 5: a repost that changes the decision is flagged or refused.
     def test_changed_repost_is_flagged_while_open_and_refused_after_review(self):
@@ -265,11 +318,28 @@ class LauncherTests(unittest.TestCase):
         self.assertTrue(install.hooks_current(data))
 
     def test_disconnect_all_creates_no_files_for_absent_apps(self):
-        self.assertEqual(install.disconnect(list(install.SOURCES)), ["codex", "claude", "hermes"])
+        expected = ["codex", "claude"]
+        try:
+            import yaml
+        except ImportError:
+            pass
+        else:
+            expected.append("hermes")
+        self.assertEqual(install.disconnect(list(install.SOURCES)), expected)
         self.assertFalse((install.CODEX_DIR / "config.toml").exists())
         self.assertFalse((install.CODEX_DIR / "hooks.json").exists())
         self.assertFalse((install.USER_DIR / ".claude.json").exists())
         self.assertFalse((install.USER_DIR / ".claude/settings.json").exists())
+
+    def test_disconnect_all_without_optional_yaml(self):
+        import builtins
+        original_import = builtins.__import__
+        def without_yaml(name, *args, **kwargs):
+            if name == "yaml":
+                raise ImportError("Optional PyYAML is not installed")
+            return original_import(name, *args, **kwargs)
+        with mock.patch("builtins.__import__", side_effect=without_yaml):
+            self.test_disconnect_all_creates_no_files_for_absent_apps()
 
 
 if __name__ == "__main__":
