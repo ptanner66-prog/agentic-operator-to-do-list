@@ -4,12 +4,11 @@ Reviewed 2026-09-13 against the Omarchy
 [development](https://plugins.omarchy.org/develop.html) and
 [publishing](https://plugins.omarchy.org/publish.html) guides.
 
-**Verdict: beta candidate.** The native to-do list, setup preservation, and local
-MCP response flow passed the automated checks below. Do not describe all idle
-desktop conversations as automatically resumable. Codex's private IPC adapter
-still needs a live end-to-end delivery and acknowledgement test in a deliberately
-created test conversation. Claude Chat and Hermes require an active wait or a
-resumed conversation to consume a saved answer.
+**Verdict: beta candidate with live Codex idle resumption verified.** The native
+list, setup preservation, local MCP flow, and one real idle Codex delivery test
+passed. The Codex result applies to desktop build `26.901.51231` with a discoverable
+conversation owner; its private interface remains version-sensitive. Claude Chat
+and Hermes require an active wait or a resumed conversation to consume an answer.
 
 ## Fixed during review
 
@@ -49,6 +48,13 @@ resumed conversation to consume a saved answer.
   exact-response acknowledgement cycle against an isolated database. Its client
   and UI clicks are scripted. This establishes the MCP path, not live LLM or idle
   desktop resumption. Screenshot and recording contain only demo data.
+- A separate real Codex task posted a request through the CLI fallback, completed
+  its first turn, and was confirmed idle before approval. The native QML Approve
+  button was activated programmatically against its isolated database. The normal
+  watcher and desktop IPC adapter resumed the same task. It read the response and
+  acknowledged the exact response ID in 7.7 seconds, then completed its second
+  turn. No wait lease or separate task-message tool resumed it. The temporary task
+  was archived after verification. See `docs/live-codex-verification.json`.
 
 A separate reviewer reported 28/31 tests passing in a restricted environment.
 All 31 passed again on this Omarchy host. The socket-cleanup unit test now mocks
@@ -65,11 +71,11 @@ versions have not been verified in this review.
 
 ## Before claiming stable desktop integration
 
-1. In each supported app, create one harmless request with a real conversation
-   link. Answer from the panel and confirm that exact response ID is acknowledged.
-2. Test idle Codex resumption separately and record the desktop build. Current
-   adapter assumptions came from build 26.901.51231; no public compatibility
-   guarantee exists. An uncertain send stays visible and is not retried.
+1. Complete equivalent real-app reply tests for Claude and Hermes. Their configured
+   settings and scripted MCP checks do not establish every desktop mode's behavior.
+2. Repeat the passed idle Codex test after desktop updates and cover additional
+   conversation states. Build 26.901.51231 passed with an available owner; no
+   public compatibility guarantee exists. Uncertain sends are not retried.
 3. Reconnect MCP tools after this update to start the presence-aware server.
    Review Codex hooks through its native hook review. App-specific instruction
    files and hooks guide agents but cannot guarantee every model follows policy.

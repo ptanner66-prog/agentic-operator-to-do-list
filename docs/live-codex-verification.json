@@ -1,0 +1,43 @@
+{
+  "result": "passed",
+  "tested_at": "2026-09-13T07:12:23.092962+00:00",
+  "plugin_version": "0.2.1",
+  "plugin_revision": "82736c98b330afe06dd7d0073382fab8157c6d27",
+  "environment": {
+    "omarchy": "4.0.3-1",
+    "codex_desktop": "26.901.51231-1",
+    "quickshell": "0.3.1-1",
+    "qt": "6.11.2-3",
+    "python": "3.14.7-1"
+  },
+  "method": [
+    "Create one user-authorized temporary Codex task using the configured default model.",
+    "The real agent posts through the CLI fallback into an isolated database using its actual task ID.",
+    "Observe the first turn complete and task status become idle; no operator_wait lease is used.",
+    "Discover the existing desktop conversation owner without sending a follow-up.",
+    "Programmatically activate the production QML Approve button in the existing shell. The test hides the popup window.",
+    "The unchanged watcher dispatcher delivers the saved approval through local Codex desktop IPC.",
+    "Observe a second real agent turn, its CLI response read and exact-ID acknowledgement, and a completed verification receipt.",
+    "Compare task ID, request ID, response ID and per-test nonce with the original request and native panel state.",
+    "Remove the isolated native test plugin and archive the temporary Codex task."
+  ],
+  "observations": {
+    "first_turn_completed_before_approval": true,
+    "idle_seconds_before_approval": 82.38,
+    "active_wait_lease": false,
+    "separate_task_message_tool_used_to_resume": false,
+    "same_task_resumed": true,
+    "exact_response_acknowledged": true,
+    "second_turn_completed": true,
+    "response_to_ack_seconds": 7.71,
+    "final_status": "done",
+    "final_delivery": "acknowledged"
+  },
+  "limits": [
+    "One local task with a discoverable owner on the recorded Codex desktop build.",
+    "The desktop IPC interface is internal and version-sensitive.",
+    "UI activation was automated; the popup was hidden to avoid interfering with current desktop work.",
+    "The request and acknowledgement used CLI fallback with isolated data; registered MCP tools were tested separately.",
+    "This test does not verify Claude/Hermes desktop modes or other Codex conversation states."
+  ]
+}

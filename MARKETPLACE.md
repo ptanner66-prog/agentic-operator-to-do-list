@@ -25,8 +25,9 @@ show live MCP connections. Requests are stored locally in SQLite, duplicate
 requests are suppressed, and agents acknowledge exact response IDs.
 
 **Beta limits:** a waiting MCP client can receive your reply directly. Idle Codex
-resumption uses an internal, version-sensitive desktop interface and still needs
-a live end-to-end verification. Idle Claude Chat and Hermes conversations must
+resumption passed a real delivery/acknowledgement test on desktop build
+26.901.51231, but uses an internal, version-sensitive interface. It requires a
+discoverable conversation owner. Idle Claude Chat and Hermes conversations must
 resume to read saved replies. Standing instructions guide agents but cannot
 guarantee compliance in every conversation.
 
@@ -37,5 +38,7 @@ guarantee compliance in every conversation.
   client and automated UI actions; not proof of idle desktop resumption.
 - `REVIEW.md`: tested versions, 31 Python tests, 22 native checks, clean-checkout
   isolated installation, and remaining integration limits.
+- `docs/live-codex-verification.json`: real idle-task resumption and exact-response
+  acknowledgement on the recorded Codex build.
 
 This is a draft for the Omarchy submission form. It has not been submitted.

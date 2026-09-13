@@ -37,7 +37,7 @@
     "Codex session hooks require its normal native hook review"
   ],
   "limitations": [
-    "Codex idle auto-resume uses private IPC and still needs a live delivery/acknowledgement test",
+    "Codex idle resumption passed on desktop build 26.901.51231 but uses private IPC and needs repeat testing after updates",
     "Idle Claude Chat and Hermes replies require a resumed conversation",
     "Fresh-machine installation and other runtime versions were not verified in this review",
     "Configuration and standing policy cannot guarantee model compliance"
@@ -57,5 +57,12 @@
     "response_acknowledged": true,
     "verifies_idle_desktop_resume": false
   },
-  "test_environment_followup": "All 31 pass on Omarchy. Socket-cleanup unit test now uses a mock endpoint. Reported child-process presence failures were not reproduced; real procfs integration checks remain enabled."
+  "test_environment_followup": "All 31 pass on Omarchy. Socket-cleanup unit test now uses a mock endpoint. Reported child-process presence failures were not reproduced; real procfs integration checks remain enabled.",
+  "live_codex_idle_resume": {
+    "passed": true,
+    "codex_desktop": "26.901.51231-1",
+    "report": "docs/live-codex-verification.json",
+    "response_to_ack_seconds": 7.71,
+    "scope": "One real idle local task with a discoverable desktop owner; automated native QML approval and CLI fallback read/ack against isolated data"
+  }
 }

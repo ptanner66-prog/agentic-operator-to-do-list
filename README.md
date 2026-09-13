@@ -7,8 +7,9 @@ context, recommendation, and consequences, then approve, reject, or reply from
 the panel. Short-term and long-term lists also hold the to-dos you explicitly
 ask agents to add.
 
-Version 0.2.1 is a beta release. The native list and local MCP flow are tested;
-automatic resumption of idle Codex desktop conversations remains experimental.
+Version 0.2.1 is a beta release. The native list and local MCP flow are tested.
+Idle Codex resumption passed a live test on desktop build `26.901.51231`; its
+internal desktop interface remains experimental and version-sensitive.
 
 ![Native Omarchy decision panel with context and reply controls](preview.png)
 
@@ -156,6 +157,15 @@ sends are not automatically retried. Open the original chat to check it before
 resending. “Sent” means accepted by the app; “Agent acknowledged” requires an
 explicit acknowledgement from the agent. It does not claim that work has resumed
 solely because a socket write succeeded.
+
+**Live verification, 2026-09-13:** a real Codex task posted an isolated request
+through the CLI fallback and finished its turn. After it became idle, the native
+panel's Approve button was activated programmatically. The unchanged dispatcher
+resumed that same task through desktop IPC; the agent read and acknowledged the
+exact response ID 7.7 seconds after approval. There was no active `operator_wait`
+and no follow-up sent through a separate task tool. This verifies one local
+task with a discoverable owner on build `26.901.51231`, not every app version or
+conversation state. See [the verification record](docs/live-codex-verification.json).
 
 **Claude Desktop:** installation configures a local MCP server in
 `~/.config/Claude/claude_desktop_config.json`. It also adds the server to Claude

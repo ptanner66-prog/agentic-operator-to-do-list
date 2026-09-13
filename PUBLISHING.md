@@ -40,6 +40,10 @@ own end-to-end test; backend tests and a successful MCP handshake do not establi
 that idle desktop conversations can resume. Claude Chat and remote Hermes bots
 have the limits documented in README.
 
+The live Codex test passed on desktop build `26.901.51231`; its method and limits
+are recorded in `docs/live-codex-verification.json`. Repeat it after desktop
+updates, and keep the beta designation while compatibility coverage is limited.
+
 ## Submit
 
 The public source repository is
