@@ -4,7 +4,7 @@
   "reviewed_on": "2026-09-13",
   "plugin_id": "portertanner.operator-todos",
   "python_tests": 42,
-  "native_ui_checks": 22,
+  "native_ui_checks": 30,
   "manifest_validation": "passed",
   "independent_review": {
     "date": "2026-09-13",
@@ -28,7 +28,11 @@
     "Green is based on live agent presence in Agents",
     "A live connection alone does not light the bar icon",
     "Red attention dot appears only while panel is closed",
-    "Cleared attention removes the red dot"
+    "Cleared attention removes the red dot",
+    "Stale hand-over and missing-conversation labels",
+    "Agent request carries its conversation ID",
+    "Failed desktop delivery keeps its reason, is labelled, and lights the dot",
+    "Retry delivery repeats the hand-over"
   ],
   "review_fixes_0_2_1": [
     "Live per-client presence with exit and heartbeat expiry checks",
@@ -64,7 +68,7 @@
     "response_acknowledged": true,
     "verifies_idle_desktop_resume": false
   },
-  "test_environment_followup": "All 42 pass on Omarchy. Socket-cleanup unit test uses a mock endpoint. Real procfs integration checks remain enabled.",
+  "test_environment_followup": "All 42 Python tests and 30 native checks pass on Omarchy. Socket-cleanup unit test uses a mock endpoint. Real procfs integration checks remain enabled. The native delivery checks use an empty CODEX_HOME.",
   "live_codex_idle_resume": {
     "passed": true,
     "plugin_version": "0.2.1",

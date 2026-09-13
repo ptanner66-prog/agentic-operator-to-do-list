@@ -27,8 +27,8 @@ the MCP reply/acknowledgement flow; it does not verify idle Codex resumption.
 </details>
 
 Click the checklist icon to open the list. A small red dot in its upper-right
-corner appears while the panel is closed when a request or failed reply delivery
-needs you. Green connection dots appear only in **Agents**. There are no
+corner appears while the panel is closed when a request, a failed reply delivery,
+or a reply unacknowledged for 15 minutes needs you. Green connection dots appear only in **Agents**. There are no
 notification popups or badge counts; the tabs read **Short term** and **Long term**.
 The panel always opens to its full size, fitted to your screen. The header and Add
 field stay in place while the list scrolls with the wheel, trackpad, scrollbar,
@@ -228,7 +228,11 @@ quotes the agent's title last. The Codex CLI fallback refuses an explicit
 `operator_wait` ends without a result and leaves the reply deliverable; a hand-over
 is recorded only after the result was written to the waiting agent.
 
-Agents get no approval, deletion, or operator-response MCP tool. A cancelled or
+Agents get no approval, deletion, or operator-response MCP tool. That is a
+convenience, not a security boundary: the boundary is this standing policy plus
+each app's own permission prompts. Any process running as your user, including an
+agent's shell, could run the human-facing `act` command, so give agents only the
+shell access you already trust them with. A cancelled or
 dismissed request never grants authorization. Several chats may write concurrently;
 SQLite transactions prevent lost writes. Reposting a request cannot silently change
 the action being approved. A materially different decision needs a new request key.
@@ -305,7 +309,10 @@ unusual TOML layouts, and rollback after failed writes. Presence tests cover act
 MCP connect/disconnect, crashes, stale heartbeats, and independent clients.
 The native smoke test temporarily loads the real panel into the existing shell,
 uses an isolated database, and exercises Add, Enter, failure recovery, History,
-count-free tab labels, and connection/attention indicator behavior.
+count-free tab labels, connection/attention indicator behavior, and an agent
+request whose desktop delivery fails closed: the reason is kept for the row, the
+dot lights, and **Retry delivery** repeats the hand-over. It points the Codex
+adapter at an empty `CODEX_HOME`, so no real desktop app is contacted.
 It never opens a window or sends physical keystrokes. Live desktop testing is still
 necessary when updating the Codex IPC adapter. See `PUBLISHING.md` for release checks.
 

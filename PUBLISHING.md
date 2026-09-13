@@ -70,7 +70,9 @@ Optional local Hermes setup: PyYAML. Tests use the same runtime.
 
 Ordinary plugin installation places the bar widget. Connecting an app is an
 explicit setup action in the panel or installer. It writes only the documented
-per-user MCP, policy and hook settings, with backups; it does not alter app
+per-user MCP, policy and hook settings plus the hook launcher and shared policy
+under `~/.config/omarchy/operator-todos/`, with backups; it does not alter app
 permission modes, trust hooks automatically, restart apps, or expose a network
-service. Disconnect integrations before removing the plugin. Saved to-dos are
-retained after disable, disconnect, or removal.
+service. Disconnect integrations, with **Disconnect all apps** in Agents or
+`install.py --disconnect`, before removing the plugin. Saved to-dos are retained
+after disable, disconnect, or removal.

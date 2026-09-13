@@ -40,7 +40,7 @@ blockers, fixed in 0.2.2 with regression tests.
 - `docs/demo.mp4` and `docs/demo.gif`: 30-second recording using a scripted MCP
   client and automated UI actions; not proof of idle desktop resumption.
 - `REVIEW.md`: the independent review, the 0.2.2 fixes, tested versions,
-  42 Python tests, 22 native checks, clean-checkout isolated installation, and
+  42 Python tests, 30 native checks, clean-checkout isolated installation, and
   remaining integration limits.
 - `docs/live-codex-verification.json`: real idle-task resumption and exact-response
   acknowledgement on the recorded Codex build.

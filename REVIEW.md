@@ -34,6 +34,11 @@ fixes each one, with regression tests in `tests/test_blockers.py`:
    old approval with no signal. While open, a changed repost returns the stored
    request with `mismatch: true`; once reviewed, it is refused.
 
+The native smoke test grew from 22 to 30 checks: it now posts an agent request
+into its isolated database, approves it, lets the Codex adapter fail closed
+against an empty `CODEX_HOME`, and checks the kept reason, the attention dot,
+and **Retry delivery**.
+
 Also from the review, without a code change: the operator boundary is policy
 plus each app's own permission prompts, not the absence of an approval tool; the
 0.2.1 live Codex test used the earlier message text, so the desktop IPC path
